@@ -1,0 +1,6 @@
+{
+  "name": "futurepilot-prototyp",
+  "private": true,
+  "type": "module",
+  "description": "FuturePilot — prototyp gry treningowej dla operatorów dronów (statyczna PWA, bez kroku budowania)"
+}

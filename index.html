@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="pl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <title>FuturePilot — trener operatora drona</title>
+    <meta name="description" content="Krótkie ćwiczenia, które uczą prawdziwego sterowania dronem: wysokość, zawis, orientacja, zakręty, FPV i prowadzenie kamery. Prototyp." />
+    <meta name="robots" content="noindex" />
+    <meta name="theme-color" content="#0b1320" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="FuturePilot" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="icons/icon-180.png" />
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+    <canvas id="gl" aria-label="Widok symulatora"></canvas>
+
+    <!-- warstwa sterowania dotykowego -->
+    <div id="touch-layer">
+      <div class="stick" id="stickL"><div class="knob"></div></div>
+      <div class="stick" id="stickR"><div class="knob"></div></div>
+    </div>
+
+    <!-- HUD lotu -->
+    <div id="hud" hidden>
+      <div class="hud-top">
+        <div class="badges">
+          <span id="hud-mode" class="badge"></span>
+          <span id="hud-src" class="badge ghost"></span>
+        </div>
+        <div class="objective">
+          <div id="hud-obj"></div>
+          <div class="bar" id="hud-barwrap"><i id="hud-bar"></i></div>
+          <div id="hud-sub"></div>
+        </div>
+        <div class="right">
+          <span id="hud-timer">0,0</span>
+          <button id="btn-view" class="hud-btn" aria-label="Zmień widok" hidden>Widok</button>
+          <button id="btn-pause" class="hud-btn" aria-label="Pauza">II</button>
+        </div>
+      </div>
+      <div id="hud-flash" aria-live="polite"></div>
+      <div id="hud-marker" hidden><span class="arrow"></span><span class="lbl"></span></div>
+      <div id="hud-frame" hidden><i></i><i></i></div>
+      <div id="osd" hidden>
+        <div class="osd-l"><span id="osd-bat"></span><span id="osd-thr"></span></div>
+        <div class="osd-c">+</div>
+        <div class="osd-r"><span id="osd-alt"></span><span id="osd-spd"></span></div>
+      </div>
+      <div id="kbd-hint" hidden></div>
+      <div id="stick-monitor" aria-hidden="true">
+        <div class="pad"><span class="dot"></span></div>
+        <div class="pad"><span class="dot"></span></div>
+      </div>
+    </div>
+
+    <div id="countdown" hidden></div>
+    <div id="screens"></div>
+    <div id="rotate" hidden>
+      <div>
+        <div class="rot-ico">⟳</div>
+        <p>Obróć telefon poziomo</p>
+        <small>Drążki działają jak w prawdziwej aparaturze — pod kciukami po obu stronach ekranu.</small>
+      </div>
+    </div>
+
+    <noscript>Do działania potrzebny jest JavaScript.</noscript>
+    <script type="module" src="js/main.js"></script>
+  </body>
+</html>
