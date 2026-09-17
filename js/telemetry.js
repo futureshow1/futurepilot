@@ -92,7 +92,7 @@ export class Telemetry {
     out.rightRev = (out.axes.pitch.revPerSec + out.axes.roll.revPerSec) / 2;
     out.rightSat = Math.max(out.axes.pitch.satFrac, out.axes.roll.satFrac);
     // płynność 0..1 — do profilu umiejętności (1 = spokojne, proporcjonalne sterowanie)
-    const jitter = Math.max(0, out.rightRev - 0.9) / 2.6;
+    const jitter = Math.max(0, out.rightRev - 1.5) / 4; // próg i skala do kalibracji; celowo łagodne dla dotyku
     out.smoothness = Math.max(0, Math.min(1, 1 - jitter - out.rightSat * 0.8));
     return out;
   }

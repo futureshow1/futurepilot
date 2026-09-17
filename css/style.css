@@ -884,3 +884,13 @@ canvas.trace {
   font: 700 11.5px/18px ui-monospace, 'SF Mono', Menlo, monospace;
   text-align: center;
 }
+
+.trend {
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 4px;
+  max-width: 460px;
+}
+.trend .up {
+  color: var(--ok);
+}

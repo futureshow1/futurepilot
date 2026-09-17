@@ -175,6 +175,7 @@ export class DroneSim {
 
   setMode(mode) {
     this.mode = MODES[mode] ? mode : 'gps';
+    this.vDamp = 0;
     this._holdAlt = null;
     this._holdPos = null;
     this._int = { x: 0, z: 0 };
@@ -394,6 +395,9 @@ export class DroneSim {
     const kd = c.dragLin + c.dragQuad * rv;
     let ax = (up.x * this.thrust) / m - kd * rvx;
     let ay = (up.y * this.thrust) / m - G - kd * rvy;
+    // asysta gazu (tylko pierwszy poziom z ręcznym gazem): tłumi wznoszenie i opadanie, więc błąd gazu
+    // daje ograniczoną prędkość pionową zamiast narastającego przyspieszenia
+    if (this.vDamp && !this.landed && (this.mode === 'angle' || this.mode === 'acro')) ay -= this.vDamp * this.v.y;
     let az = (up.z * this.thrust) / m - kd * rvz;
 
     const r = c.radius * 0.5;

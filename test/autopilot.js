@@ -104,7 +104,10 @@ const POLICIES = {
     const p = d.pads[Math.min(d.i, d.pads.length - 1)];
     const dh = Math.hypot(s.p.x - p.x, s.p.z - p.z);
     if (!d.wasHigh) return flyTo(fp, { x: s.p.x, y: 2.2, z: s.p.z });
-    if (dh > 0.4 || s.hSpeed > 0.6) return flyTo(fp, { x: p.x, y: 2.0, z: p.z }, { vmax: 3 });
+    // niezdarny gracz nie czeka na ideał: schodzi, gdy jest „mniej więcej nad" lądowiskiem
+    const tolD = POLICIES._clumsy ? 1.0 : 0.4,
+      tolV = POLICIES._clumsy ? 1.4 : 0.6;
+    if (dh > tolD || s.hSpeed > tolV) return flyTo(fp, { x: p.x, y: 2.0, z: p.z }, { vmax: 3 });
     const st = flyTo(fp, { x: p.x, y: 0, z: p.z });
     st.throttle = s.mode === 'angle' ? (s.altitude > 0.8 ? -0.16 : -0.07) : -0.4;
     return st;
@@ -144,14 +147,20 @@ const POLICIES = {
   },
 };
 
-export async function runDrill(id, level, { maxSec = 200, dt = 1 / 60, noise = 0 } = {}) {
+// clumsy: przybliżenie niezdarnego początkującego — reaguje z opóźnieniem (trzyma poprzednie wychylenie ok. 0,4 s),
+// ma drżącą rękę i przesterowuje. To NIE zastępuje testów z ludźmi; pozwala tylko sprawdzić, czy poziom 1
+// da się zaliczyć kiepskim sterowaniem i jaką ocenę wtedy daje gra.
+export async function runDrill(id, level, { maxSec = 200, dt = 1 / 60, noise = 0, clumsy = false, seed0 = 7 } = {}) {
   const fp = window.__fp;
   fp.startDrill(id, level);
   trim.x = trim.z = 0;
+  POLICIES._clumsy = clumsy;
   let n = 0;
   const maxN = maxSec / dt;
-  let seed = 7;
+  let seed = seed0;
   const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296 - 0.5) * 2;
+  let held = null,
+    heldN = 0;
   while (fp.app.state !== 'result' && n < maxN) {
     const d = fp.app.drill;
     let st = { throttle: 0, yaw: 0, pitch: 0, roll: 0 };
@@ -159,6 +168,19 @@ export async function runDrill(id, level, { maxSec = 200, dt = 1 / 60, noise = 0
     if (noise) {
       st.pitch = clamp(st.pitch + rnd() * noise, -1, 1);
       st.roll = clamp(st.roll + rnd() * noise, -1, 1);
+    }
+    if (clumsy && fp.app.state === 'flying') {
+      if (!held || heldN <= 0) {
+        held = {
+          throttle: clamp(st.throttle * 1.3 + rnd() * 0.2, -1, 1),
+          yaw: clamp(st.yaw * 1.4 + rnd() * 0.25, -1, 1),
+          pitch: clamp(st.pitch * 1.5 + rnd() * 0.3, -1, 1),
+          roll: clamp(st.roll * 1.5 + rnd() * 0.3, -1, 1),
+        };
+        heldN = 18 + Math.floor(Math.abs(rnd()) * 14); // 0,3–0,5 s „zamrożonej" reakcji
+      }
+      heldN--;
+      st = held;
     }
     // gaz w trybach ręcznych: autopilot podaje surową pozycję drążka
     fp.input.injected = st;

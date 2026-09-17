@@ -41,6 +41,11 @@ class Drill {
     this.completed = false;
     this.crashes = 0;
     this.penalty = 0;
+    // Pierwsze poziomy mają uczyć, nie odsiewać: luźniejsze normy czasu i tańsze kraksy.
+    // Surowość rośnie z poziomem; pełne wymagania od poziomu 3. (Do kalibracji na testach z ludźmi.)
+    // `ease` w konfiguracji poziomu oznacza „pierwszy kontakt z nowym trybem" (np. ręczny gaz) — też traktowany łagodnie.
+    this.ease = this.cfg.ease || (level === 1 ? 1.8 : level === 2 ? 1.4 : 1);
+    this.crashCost = this.ease >= 1.6 ? 6 : this.ease >= 1.4 ? 9 : 12;
   }
   get mode() {
     return this.cfg.mode;
@@ -52,7 +57,7 @@ class Drill {
     return this.constructor.drone || 'trainer';
   }
   get timeLimit() {
-    return this.cfg.limit || 90;
+    return (this.cfg.limit || 90) * (this.ease >= 1.6 ? 1.6 : this.ease >= 1.4 ? 1.3 : 1);
   }
   start() {
     return { pos: { x: 0, y: 0, z: -6 }, heading: 0, airborne: false };
@@ -65,7 +70,7 @@ class Drill {
   }
   onCrash(ctx) {
     this.crashes++;
-    this.penalty += 12;
+    this.penalty += this.crashCost;
   }
   finish(completed) {
     this.done = true;
@@ -75,7 +80,7 @@ class Drill {
     const sum = ctx.telemetry.summary();
     score = Math.round(Math.max(0, Math.min(100, score - this.penalty)));
     if (this.crashes) metrics.push({ label: 'Kraksy', value: String(this.crashes), good: 0 });
-    metrics.push({ label: 'Płynność sterowania', value: `${Math.round(sum.smoothness * 100)}%`, good: sum.smoothness });
+    metrics.push({ label: 'Płynność sterowania (orientacyjnie)', value: `${Math.round(sum.smoothness * 100)}%`, good: sum.smoothness, neutral: true });
     const manual = this.mode === 'angle' || this.mode === 'acro';
     const all = [...tips, ...coachTips(sum, { manualThrottle: manual, usesYaw: this.constructor.usesYaw })].slice(0, 3);
     return { score, stars: starsFor(score, this.completed), completed: this.completed, metrics, tips: all, summary: sum };
@@ -99,7 +104,8 @@ export class DrillAltitude extends Drill {
   static levels = [
     { mode: 'gps', tol: 0.75, targets: [2.5, 5, 3], hold: 2.5, limit: 80, par: 34 },
     { mode: 'alt', tol: 0.55, targets: [2, 6, 3.5, 1.5], hold: 3, wind: 1.5, limit: 90, par: 46 },
-    { mode: 'angle', tol: 0.7, targets: [2.5, 5, 3], hold: 3, limit: 90, par: 40 },
+    { mode: 'angle', tol: 0.85, targets: [2.5, 5, 3], hold: 2.5, limit: 90, par: 40, assist: 1.6, ease: 1.6 },
+    { mode: 'angle', tol: 0.7, targets: [2.5, 5, 3], hold: 3, limit: 110, par: 44, ease: 1.4 },
     { mode: 'angle', tol: 0.45, targets: [2, 6, 3.5, 1.5], hold: 3, wind: 2, gust: 0.6, limit: 100, par: 52 },
   ];
   setup(ctx) {
@@ -175,13 +181,13 @@ export class DrillAltitude extends Drill {
     const frac = this.completed ? 1 : this.i / (c.targets.length + 1);
     let score = 100 * frac;
     if (this.completed) {
-      score -= clamp01((this.t - c.par) / c.par) * 35;
+      score -= clamp01((this.t - c.par * this.ease) / (c.par * this.ease)) * 35;
       score -= this.overshoots * 4;
       score -= clamp01(((this.tdSpeed || 0) - 0.8) / 1.6) * 22; // twarde przyziemienie to realne uszkodzenia
       score -= clamp01(((this.tdDist || 0) - 0.5) / 2) * 12;
     } else score *= 0.6;
     const m = [
-      { label: 'Czas', value: `${fmt(this.t)} s`, good: clamp01(1 - (this.t - c.par) / c.par) },
+      { label: 'Czas', value: `${fmt(this.t)} s`, good: clamp01(1 - (this.t - c.par * this.ease) / (c.par * this.ease)) },
       { label: 'Przestrzelenia wysokości', value: String(this.overshoots), good: clamp01(1 - this.overshoots / 4) },
     ];
     const tips = [];
@@ -205,7 +211,8 @@ export class DrillHover extends Drill {
   static why = 'Zawis to fundament: kto umie stać w miejscu mimo wiatru, ten panuje nad dronem.';
   static levels = [
     { mode: 'alt', box: [4.5, 3, 4.5], wind: 1.5, gust: 0.3, T: 30, limit: 70 },
-    { mode: 'angle', box: [4.5, 3.2, 4.5], T: 30, limit: 75 },
+    { mode: 'angle', box: [4.8, 3.6, 4.8], T: 30, limit: 75, assist: 1.6, ease: 1.6 },
+    { mode: 'angle', box: [4.5, 3.2, 4.5], T: 30, limit: 80, ease: 1.4 },
     { mode: 'angle', box: [3.2, 2.4, 3.2], wind: 2, gust: 0.8, T: 30, limit: 75 },
     { mode: 'angle', box: [3.6, 2.8, 3.6], wind: 1.5, gust: 0.5, T: 30, limit: 75, noseIn: true },
     { mode: 'acro', box: [5.5, 4, 5.5], T: 25, limit: 75 },
@@ -286,7 +293,8 @@ export class DrillSquare extends Drill {
   static levels = [
     { mode: 'gps', r: 1.3, hold: 1.2, n: 5, random: false, par: 7, limit: 80 },
     { mode: 'alt', r: 1.3, hold: 1.5, n: 6, random: true, par: 8, limit: 95 },
-    { mode: 'angle', r: 1.25, hold: 1.5, n: 6, random: true, par: 8.5, limit: 100 },
+    { mode: 'angle', r: 1.3, hold: 1.5, n: 6, random: true, par: 8.5, limit: 100, assist: 1.6, ease: 1.6 },
+    { mode: 'angle', r: 1.25, hold: 1.5, n: 6, random: true, par: 8.5, limit: 110, ease: 1.4 },
     { mode: 'angle', r: 1.1, hold: 1.5, n: 6, random: true, wind: 2, gust: 0.6, par: 9.5, limit: 110 },
   ];
   start() {
@@ -367,7 +375,7 @@ export class DrillSquare extends Drill {
   result(ctx) {
     const c = this.cfg,
       N = this.order.length;
-    const par = c.par * N + 6;
+    const par = (c.par * N + 6) * this.ease;
     const frac = this.i / N;
     let score = this.completed ? 100 - clamp01((this.t - par) / par) * 45 - this.overshoots * 3.5 : 55 * frac;
     const sum = ctx.telemetry.summary();
@@ -547,7 +555,8 @@ export class DrillEight extends Drill {
   static levels = [
     { mode: 'gps', laps: 1, r: 2.7, par: 50, slipW: 0.15, limit: 110 },
     { mode: 'alt', laps: 1, r: 2.5, par: 46, slipW: 0.25, limit: 110 },
-    { mode: 'angle', laps: 2, r: 2.3, par: 84, slipW: 0.3, limit: 150 },
+    { mode: 'angle', laps: 2, r: 2.4, par: 84, slipW: 0.3, limit: 150, assist: 1.6, ease: 1.6 },
+    { mode: 'angle', laps: 2, r: 2.3, par: 84, slipW: 0.3, limit: 160, ease: 1.4 },
     { mode: 'angle', laps: 2, r: 2.1, par: 88, slipW: 0.3, wind: 2, gust: 0.7, limit: 160 },
     { mode: 'acro', laps: 2, r: 2.6, par: 90, slipW: 0.3, limit: 170 },
   ];
@@ -630,7 +639,7 @@ export class DrillEight extends Drill {
     const slip = this.slipN ? this.slipSum / this.slipN : 90;
     const slipQ = clamp01(1 - (slip - 12) / 50);
     const altQ = clamp01(1 - (this.altOut / Math.max(this.flyT, 1)) * 2.5);
-    const timeQ = clamp01(1 - (this.t - c.par) / c.par);
+    const timeQ = clamp01(1 - (this.t - c.par * this.ease) / (c.par * this.ease));
     let score = this.completed ? 100 * ((1 - c.slipW - 0.15) * (0.45 + 0.55 * timeQ) + c.slipW * slipQ + 0.15 * altQ) : 50 * frac;
     const m = [
       { label: 'Czas', value: `${fmt(this.t)} s`, good: timeQ },
@@ -657,7 +666,7 @@ export class DrillGates extends Drill {
   static levels = [
     { mode: 'alt', gates: 6, inner: 3.8, turn: 18, dy: 0, tilt: 8, pace: 2.8, limit: 90 },
     { mode: 'alt', gates: 8, inner: 3.4, turn: 32, dy: 0.9, tilt: 8, pace: 3.1, limit: 110 },
-    { mode: 'angle', gates: 8, inner: 3.4, turn: 30, dy: 0.7, tilt: 12, pace: 3.4, limit: 120 },
+    { mode: 'angle', gates: 8, inner: 3.6, turn: 30, dy: 0.7, tilt: 12, pace: 3.4, limit: 120, assist: 1.6, ease: 1.6 },
     { mode: 'angle', gates: 10, inner: 3.0, turn: 42, dy: 1.0, tilt: 15, pace: 4.0, limit: 130 },
     { mode: 'acro', gates: 8, inner: 3.8, turn: 28, dy: 0.6, tilt: 20, pace: 3.4, limit: 140 },
   ];
@@ -743,13 +752,13 @@ export class DrillGates extends Drill {
   }
   onCrash(ctx) {
     this.crashes++;
-    this.penalty += 8;
+    this.penalty += Math.round(this.crashCost * 0.67);
     this._prev = null;
   }
   result(ctx) {
     const c = this.cfg;
     const frac = this.i / this.gates.length;
-    const par = this.length / c.pace + 4; // tempo odniesienia rośnie z poziomem (do kalibracji na testach z ludźmi)
+    const par = (this.length / c.pace + 4) * this.ease; // tempo odniesienia rośnie z poziomem (do kalibracji na testach z ludźmi)
     const timeQ = clamp01(1 - (this.t - par) / par);
     let score = this.completed ? 100 * (0.5 + 0.5 * timeQ) - this.misses * 4 : 55 * frac;
     const m = [
@@ -842,7 +851,7 @@ export class DrillOrbit extends Drill {
     const mean = this.n ? this.rSum / this.n : 0;
     const std = this.n ? Math.sqrt(Math.max(0, this.rSq / this.n - mean * mean)) : 0;
     const frameQ = clamp01(1 - (rms - 3) / (c.tol * 1.6));
-    const timeQ = clamp01(1 - (this.t - c.par) / c.par);
+    const timeQ = clamp01(1 - (this.t - c.par * this.ease) / (c.par * this.ease));
     const rQ = clamp01(1 - (std - 0.8) / 4);
     let score = this.completed ? 100 * (0.4 * frameQ + 0.35 * (0.4 + 0.6 * timeQ) + 0.25 * rQ) : 50 * frac;
     const m = [
@@ -869,7 +878,8 @@ export class DrillLanding extends Drill {
   static levels = [
     { mode: 'gps', pads: [[-4, -9], [5, -14], [0, -8]], limit: 100, par: 60 },
     { mode: 'alt', pads: [[5, -10], [-6, -16], [0, -22]], wind: 1.5, limit: 120, par: 70 },
-    { mode: 'angle', pads: [[-5, -10], [6, -15], [0, -9]], limit: 120, par: 70 },
+    { mode: 'angle', pads: [[-5, -10], [6, -15], [0, -9]], limit: 120, par: 70, assist: 1.6, ease: 1.6 },
+    { mode: 'angle', pads: [[5, -11], [-6, -16], [0, -10]], limit: 130, par: 72, ease: 1.4 },
     { mode: 'angle', pads: [[6, -12], [-8, -20], [2, -28]], wind: 2.2, gust: 0.7, limit: 140, par: 85 },
   ];
   start() {
@@ -920,7 +930,7 @@ export class DrillLanding extends Drill {
     const avgV = n ? this.res.reduce((a, r) => a + r.v, 0) / n : 9;
     const precQ = clamp01(1 - (avgD - 0.15) / 1.3);
     const softQ = clamp01(1 - (avgV - 0.7) / 1.5);
-    const timeQ = clamp01(1 - (this.t - c.par) / c.par);
+    const timeQ = clamp01(1 - (this.t - c.par * this.ease) / (c.par * this.ease));
     let score = this.completed ? 100 * (0.6 * precQ + 0.2 * softQ + 0.2 * (0.4 + 0.6 * timeQ)) : 45 * (n / this.pads.length) * precQ;
     const m = [
       { label: 'Średnia odległość od środka', value: `${fmt(avgD, 2)} m`, good: precQ },

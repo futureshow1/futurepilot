@@ -56,18 +56,29 @@ export const store = {
     this.save();
     return { newBest, prevBest: prev.best };
   },
-  // najwyższy dostępny poziom: kolejny odblokowuje się po 2 gwiazdkach na poprzednim
+  // Kolejny poziom otwiera ZALICZENIE poprzedniego (1 gwiazdka) albo trzy próby — nikt nie utyka.
+  // Dwie i trzy gwiazdki to cele mistrzowskie (i przyszłe warunki licencji), a nie bramka do dalszej gry.
   unlocked(id) {
     const D = DRILLS.find((d) => d.id === id);
     if (!this.data.settings.courseMode) return D.levels.length;
     let l = 1;
-    while (l < D.levels.length && ((this.best(id, l) || {}).stars || 0) >= 2) l++;
+    const open = (n) => {
+      const b = this.best(id, n) || {};
+      return (b.stars || 0) >= 1 || (b.runs || 0) >= 3;
+    };
+    while (l < D.levels.length && open(l)) l++;
     return l;
   },
   recommended(id) {
     const D = DRILLS.find((d) => d.id === id);
-    for (let l = 1; l <= D.levels.length; l++) if (((this.best(id, l) || {}).stars || 0) < 2) return l;
-    return D.levels.length;
+    // zostań na poziomie do 2 gwiazdek, ale nie dłużej niż 3 próby od zaliczenia — potem wyżej
+    const max = this.unlocked(id);
+    for (let l = 1; l <= max; l++) {
+      const b = this.best(id, l) || {};
+      const mastered = (b.stars || 0) >= 2 || ((b.stars || 0) >= 1 && (b.runs || 0) >= 3);
+      if (!mastered || l === max) return l;
+    }
+    return max;
   },
   drillMastery(id) {
     const D = DRILLS.find((d) => d.id === id);
@@ -94,9 +105,10 @@ export const store = {
   dailyPlan() {
     const mastery = this.skillMastery();
     const byWeak = [...DRILLS].sort((a, b) => this.drillMastery(a.id) - this.drillMastery(b.id) || mastery[a.skill] - mastery[b.skill]);
-    const plan = [byWeak[0]];
-    const byOld = [...DRILLS].filter((d) => !plan.includes(d)).sort((a, b) => this.lastPlayed(a.id) - this.lastPlayed(b.id));
-    plan.push(byOld[0]);
+    // kolejność ma znaczenie dla motywacji: najpierw powtórka (rozgrzewka), potem najsłabsza umiejętność, na koniec deser
+    const weakest = byWeak[0];
+    const byOld = [...DRILLS].filter((d) => d !== weakest).sort((a, b) => this.lastPlayed(a.id) - this.lastPlayed(b.id));
+    const plan = [byOld[0], weakest];
     const fun = ['gates', 'orbit', 'eight'].map((id) => DRILLS.find((d) => d.id === id)).filter((d) => !plan.includes(d));
     plan.push(fun[this.data.totals.runs % fun.length]);
     // pierwszy kontakt zawsze zaczyna się od startu i wysokości

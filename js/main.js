@@ -285,8 +285,8 @@ function showBrief(id, level) {
         <p>${esc(D.goal)}</p>
         <p class="note"><b>Po co to ćwiczenie?</b> ${esc(D.why)}</p>
         <div class="levels">${lv}</div>
-        ${unlocked < D.levels.length ? `<p class="note">Kolejny poziom odblokowują 2 gwiazdki na poprzednim.</p>` : ''}
-        <div class="modebox"><b>Tryb lotu: ${MODES[cfg.mode].label}</b> — ${esc(MODES[cfg.mode].long)}.${cfg.wind ? ` Wiatr około ${fmt(cfg.wind)} m/s${cfg.gust ? ' z porywami' : ''} — patrz na rękaw przy polu.` : ''}</div>
+        ${unlocked < D.levels.length ? `<p class="note">Kolejny poziom otwiera zaliczenie poprzedniego (1 gwiazdka) albo trzy próby. Dwie i trzy gwiazdki to cele na mistrzostwo.</p>` : ''}
+        <div class="modebox"><b>Tryb lotu: ${MODES[cfg.mode].label}</b> — ${esc(MODES[cfg.mode].long)}.${cfg.wind ? ` Wiatr około ${fmt(cfg.wind)} m/s${cfg.gust ? ' z porywami' : ''} — patrz na rękaw przy polu.` : ''}${cfg.assist ? ' <b>Asysta gazu:</b> na tym poziomie gra łagodzi wznoszenie i opadanie, żeby łatwiej było wyczuć ręczny gaz. Na kolejnym poziomie asysta znika.' : ''}</div>
       </div>
       <div class="card">
         ${controlsHtml(cfg.mode)}
@@ -308,12 +308,21 @@ function showResult(res, rec) {
   setFlightUi(false);
   const D = app.D;
   const metrics = res.metrics
-    .map((m) => `<li><span>${esc(m.label)}</span><b>${esc(m.value)}</b>${m.good === null || m.good === undefined ? '' : `<span class="q"><i style="width:${Math.round(Math.max(0.04, m.good) * 100)}%;background:${qColor(m.good)}"></i></span>`}</li>`)
+    .map((m) => `<li><span>${esc(m.label)}</span><b>${esc(m.value)}</b>${m.good === null || m.good === undefined ? '' : `<span class="q"><i style="width:${Math.round(Math.max(0.04, m.good) * 100)}%;background:${m.neutral ? 'var(--blue)' : qColor(m.good)}"></i></span>`}</li>`)
     .join('');
   const tips = res.tips.length ? `<ul class="tips">${res.tips.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>` : '<p class="note">Czysty lot — nie mam uwag. Spróbuj wyższego poziomu.</p>';
-  const canNext = res.stars >= 2 && app.level < D.levels.length;
+  const canNext = app.level < D.levels.length && store.unlocked(D.id) > app.level;
   const more = app.playlist && app.pIndex < app.playlist.length - 1;
-  const head = res.completed ? (res.stars === 3 ? 'Wzorowo!' : res.stars === 2 ? 'Zaliczone' : res.stars === 1 ? 'Zaliczone — do poprawy' : 'Ukończone, ale bez gwiazdki') : 'Nie tym razem';
+  const head = res.completed ? (res.stars === 3 ? 'Wzorowo!' : res.stars === 2 ? 'Bardzo dobrze' : res.stars === 1 ? 'Zaliczone' : 'Ukończone — gwiazdka jest blisko') : 'Jeszcze nie — spróbuj ponownie';
+  // porównanie z WŁASNĄ poprzednią próbą: dla początkującego ważniejsze niż norma
+  const mine = store.data.runs.filter((r) => r.id === D.id && r.level === app.level);
+  const prevRun = mine.length >= 2 ? mine[mine.length - 2] : null;
+  let trend;
+  if (!prevRun) trend = 'Pierwsza próba na tym poziomie — to twój punkt odniesienia.';
+  else if (res.score > prevRun.score) trend = `<b class="up">▲ +${res.score - prevRun.score}</b> względem poprzedniej próby (${prevRun.score} → ${res.score}).`;
+  else if (res.score === prevRun.score) trend = `Tak samo jak poprzednio (${res.score}). Stabilność też jest postępem.`;
+  else trend = `Poprzednio ${prevRun.score}, teraz ${res.score}. Wahania są normalne — liczy się kierunek po kilku próbach.`;
+  if (!res.completed) trend += ' Na tym etapie to normalne: każda próba utrwala układ drążków.';
   show(
     `
     <div class="card">
@@ -322,7 +331,8 @@ function showResult(res, rec) {
         <div>
           <div class="kicker">${esc(D.title)} · poziom ${app.level} · ${MODES[D.levels[app.level - 1].mode].label}</div>
           <div class="score"><b>${res.score}</b> / 100 · ${head}</div>
-          ${rec.newBest ? `<div class="record">Nowy rekord${rec.prevBest ? ` (poprzednio ${rec.prevBest})` : ''}</div>` : ''}
+          ${rec.newBest && rec.prevBest ? `<div class="record">Nowy rekord (poprzednio ${rec.prevBest})</div>` : ''}
+          <div class="trend">${trend}</div>
         </div>
       </div>
       <div class="cols">
@@ -482,7 +492,7 @@ function showSettings() {
       <div class="set"><div>Przybliżanie w widoku z ziemi<small>Kompensuje mały ekran: daleki dron jest lekko przybliżany.</small></div>${seg('zoomAssist', [[true, 'Tak'], [false, 'Nie']], s.zoomAssist)}</div>
       <div class="set"><div>Linia pionu pod dronem<small>Ułatwia ocenę, nad czym jest dron. Wyłącz, gdy poczujesz się pewnie.</small></div>${seg('plumbAssist', [[true, 'Tak'], [false, 'Nie']], s.plumbAssist)}</div>
       <div class="set"><div>Jakość grafiki<small>Niższa oszczędza baterię i pomaga na starszych telefonach.</small></div>${seg('quality', [[1, 'Wysoka'], [0.75, 'Średnia'], [0.5, 'Niska']], s.quality)}</div>
-      <div class="set"><div>Tryb kursu<small>Poziomy odblokowują się po zdobyciu 2 gwiazdek. Wyłącz, żeby mieć dostęp do wszystkiego (tryb testowy).</small></div>${seg('courseMode', [[true, 'Kurs'], [false, 'Wszystko odblokowane']], s.courseMode)}</div>
+      <div class="set"><div>Tryb kursu<small>Kolejny poziom otwiera zaliczenie poprzedniego albo trzy próby. Wyłącz, żeby mieć dostęp do wszystkiego (tryb testowy).</small></div>${seg('courseMode', [[true, 'Kurs'], [false, 'Wszystko odblokowane']], s.courseMode)}</div>
       <div class="set"><div>Kontroler<small>${gp ? esc(gp.id.slice(0, 60)) : 'Nie wykryto. Podłącz gamepad lub aparaturę RC i porusz drążkiem.'}</small></div><button class="btn small" data-act="wizard" ${gp ? '' : 'disabled'}>Przypisz osie</button></div>
       <div class="set"><div>Postępy<small>Wszystko jest zapisane wyłącznie na tym urządzeniu.</small></div><button class="btn small" data-act="reset">Wyzeruj postępy</button></div>
     </div>`);
@@ -657,12 +667,13 @@ function startDrill(id, level) {
   const drill = (app.drill = new D(level));
   sim.setDrone(drill.drone);
   sim.setMode(drill.mode);
+  sim.vDamp = drill.cfg.assist || 0;
   input.setThrottleCentering(MODES[drill.mode].centeringThrottle);
   drill.setup(ctx);
   ctx.respawnTo(drill.start());
   world.setView(drill.view);
   app.assistView = false;
-  hudEl.mode.textContent = MODES[drill.mode].label;
+  hudEl.mode.textContent = MODES[drill.mode].label + (drill.cfg.assist ? ' + asysta' : '');
   // ściąga klawiszy (komputer): w trybach ręcznych gaz nie wraca sam — W/S go dodają i odejmują
   const manualThr = !MODES[drill.mode].centeringThrottle;
   hudEl.kbd.innerHTML =
@@ -794,7 +805,7 @@ function step(dt, render = true) {
     }
     hudEl.timer.textContent = fmt(drill.t);
     if (drill.t > drill.timeLimit && !drill.done) {
-      hud.flash('Koniec czasu', 'bad');
+      hud.flash('Koniec czasu', 'info');
       drill.finish(false);
     }
     if (drill.done) endDrill();
