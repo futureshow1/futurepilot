@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="pl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>FuturePilot — karta recenzenta</title>
+    <meta name="theme-color" content="#0b1320" />
+    <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+    <style>
+      :root { --bg:#0b1320; --panel:#121c2e; --panel2:#18243a; --line:rgba(255,255,255,.12); --text:#e8eef7; --muted:#9fb0c8; --accent:#ffb020; --ok:#3ddc84; }
+      * { box-sizing: border-box; }
+      body { margin:0; background:var(--bg); color:var(--text); font:16px/1.5 system-ui,-apple-system,'Segoe UI',Roboto,sans-serif; }
+      main { max-width: 820px; margin: 0 auto; padding: 22px 16px 80px; }
+      h1 { font-size: clamp(24px,5vw,34px); margin: 0 0 4px; letter-spacing:.02em; }
+      h1 b { color: var(--accent); }
+      h2 { font-size: 13px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); margin: 28px 0 10px; }
+      p { margin: 8px 0; } .note { color: var(--muted); font-size: 14px; }
+      a { color: var(--accent); }
+      .card { background: var(--panel); border:1px solid var(--line); border-radius: 14px; padding: 14px 16px; margin: 10px 0; }
+      .q { margin: 14px 0 0; } .q > label, .q > .lbl { display:block; font-weight:650; margin-bottom:6px; }
+      .q small { display:block; color:var(--muted); font-weight:400; margin-top:2px; }
+      textarea, input[type=text] { width:100%; padding:11px 12px; border-radius:10px; border:1px solid var(--line); background:#0d1626; color:var(--text); font:inherit; resize:vertical; }
+      textarea:focus, input:focus { outline:2px solid var(--accent); outline-offset:1px; }
+      .scale { display:flex; gap:6px; align-items:center; flex-wrap:wrap; font-size:13px; color:var(--muted); }
+      .scale button, .chips button { min-width:46px; height:46px; padding:0 12px; border-radius:11px; border:1px solid var(--line); background:var(--panel2); color:var(--text); font:inherit; font-weight:750; cursor:pointer; }
+      .scale button.on, .chips button.on { background:var(--accent); color:#1a1204; border-color:transparent; }
+      .chips { display:flex; gap:6px; flex-wrap:wrap; }
+      .modes { display:grid; gap:12px; }
+      .mode { border-left:3px solid var(--accent); padding-left:12px; }
+      .mode b { display:block; }
+      details { margin: 8px 0; } summary { cursor:pointer; color:var(--accent); font-weight:650; }
+      table { border-collapse: collapse; width:100%; font-size:14px; margin-top:8px; } td { border-bottom:1px solid var(--line); padding:5px 4px; vertical-align:top; } td:first-child { color:var(--muted); width:46%; }
+      .bar { position:sticky; bottom:0; background:rgba(11,19,32,.94); border-top:1px solid var(--line); padding:10px 16px; display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap; align-items:center; }
+      .btn { min-height:46px; padding:0 18px; border-radius:12px; border:1px solid var(--line); background:var(--panel2); color:var(--text); font:inherit; font-weight:750; cursor:pointer; }
+      .btn.primary { background:var(--accent); color:#1a1204; border-color:transparent; }
+      #status { color:var(--muted); font-size:14px; margin-right:auto; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>FUTURE<b>PILOT</b> · karta recenzenta</h1>
+      <p class="note">Wersja testowa · około 25 minut razem z lataniem · odpowiedzi zapisują się na bieżąco w tej przeglądarce</p>
+
+      <div class="card">
+        <p><b>O co prosimy.</b> FuturePilot ma być łatwym, uczciwym wstępem do sterowania dronem dla ludzi, którzy nigdy nie latali. Potrzebujemy oka kogoś, kto lata naprawdę: co tu jest prawdziwe, co fałszywe, czego brakuje i co może nauczyć złych nawyków. Krytyka jest mile widziana — im konkretniejsza, tym lepiej.</p>
+        <p><b>Jak testować.</b> Otwórz <a href="./" target="_blank" rel="noopener">grę</a> (telefon poziomo albo komputer). Zacznij od „Pierwszego lotu w 3 minuty", a potem w <i>Ustawieniach</i> wyłącz „Tryb kursu", żeby mieć dostęp do wszystkich poziomów i trybów. Jeśli masz gamepad albo aparaturę z trybem joysticka USB — podłącz i porównaj z dotykiem.</p>
+        <details>
+          <summary>Parametry modelu lotu (dla dociekliwych)</summary>
+          <table>
+            <tr><td>Dron treningowy</td><td>klasa 3,5″, 249 g, ciąg do ciężaru 3,0; zawis przy 50% gazu</td></tr>
+            <tr><td>Tryb GPS</td><td>do 7,5 m/s, wznoszenie 3 m/s, opadanie 2,2 m/s, obrót 110°/s; trzyma pozycję i hamuje sam</td></tr>
+            <tr><td>Tryb STABILNY</td><td>trzyma wysokość, nie trzyma pozycji (jak ATTI); przechył do 22°</td></tr>
+            <tr><td>Tryb ANGLE</td><td>samopoziomowanie, gaz ręczny, przechył do 35°, obrót 170°/s</td></tr>
+            <tr><td>Tryb ACRO</td><td>krzywe „Actual": środek 130°/s, maksimum 520°/s, expo 0,45; yaw 120/400°/s</td></tr>
+            <tr><td>Kamera FPV</td><td>pochylenie 8–20° zależnie od poziomu, szeroki kąt</td></tr>
+            <tr><td>Uproszczenia</td><td>brak prop-washu i efektu przyziemnego; opór liniowy i kwadratowy; wiatr do około 2,5 m/s z porywami</td></tr>
+          </table>
+        </details>
+      </div>
+
+      <form id="f" autocomplete="off">
+        <h2>1 · Ty i sprzęt</h2>
+        <div class="card">
+          <div class="q"><label for="kto">Czym latasz na co dzień i od jak dawna? Uczysz innych?</label><textarea id="kto" rows="2" data-k="Doświadczenie"></textarea></div>
+          <div class="q"><span class="lbl">Sterowanie użyte w teście</span>
+            <div class="chips" data-k="Sterowanie w teście" data-multi="1"><button type="button">dotyk</button><button type="button">gamepad</button><button type="button">aparatura przez USB</button><button type="button">klawiatura</button></div></div>
+        </div>
+
+        <h2>2 · Czucie lotu</h2>
+        <div class="card modes">
+          <p class="note">Skala: 1 — nie przypomina prawdziwego lotu, 5 — bardzo przypomina.</p>
+          <div class="mode"><b>GPS (jak dron z kamerą)</b><div class="scale" data-k="Czucie GPS"></div></div>
+          <div class="mode"><b>STABILNY (trzyma wysokość, znosi go)</b><div class="scale" data-k="Czucie STABILNY"></div></div>
+          <div class="mode"><b>ANGLE (gaz ręczny)</b><div class="scale" data-k="Czucie ANGLE"></div></div>
+          <div class="mode"><b>ACRO</b><div class="scale" data-k="Czucie ACRO"></div></div>
+          <div class="q"><label for="czucie">Co konkretnie jest nie tak?<small>Na przykład: bezwładność i hamowanie, reakcja na gaz i punkt zawisu, prędkości obrotu, opór i prędkość maksymalna, zachowanie na wietrze, pochylenie kamery FPV.</small></label><textarea id="czucie" rows="4" data-k="Czucie lotu — uwagi"></textarea></div>
+        </div>
+
+        <h2>3 · Widoczność i sterowanie</h2>
+        <div class="card">
+          <div class="q"><span class="lbl">Czy w widoku z ziemi widać, gdzie dron jest i dokąd patrzy?</span><div class="scale" data-k="Czytelność widoku z ziemi"></div></div>
+          <div class="q"><span class="lbl">Drążki dotykowe: da się tym sensownie sterować?</span><div class="scale" data-k="Drążki dotykowe"></div></div>
+          <div class="q"><label for="gaz">Gaz bez sprężyny na ekranie (w ANGLE i ACRO gałka zostaje tam, gdzie ją zostawisz) — ma sens czy przeszkadza?</label><textarea id="gaz" rows="2" data-k="Gaz bez sprężyny"></textarea></div>
+        </div>
+
+        <h2>4 · Program nauki</h2>
+        <div class="card">
+          <div class="q"><label for="kolejnosc">Kolejność: start → zawis → kwadrat → lądowanie na punkt → orientacja („nosem do siebie") → ósemka → bramki FPV → orbita. Co warto przestawić, a co dodać?</label><textarea id="kolejnosc" rows="3" data-k="Kolejność i braki"></textarea></div>
+          <div class="q"><label for="bledy">Jakie trzy błędy początkujących widzisz najczęściej? Czy gra je ćwiczy?</label><textarea id="bledy" rows="3" data-k="Typowe błędy początkujących"></textarea></div>
+          <div class="q"><label for="dziesiec">Co warto pokazać komuś w pierwszych dziesięciu minutach z prawdziwym dronem?</label><textarea id="dziesiec" rows="2" data-k="Pierwsze 10 minut"></textarea></div>
+        </div>
+
+        <h2>5 · Uczciwość</h2>
+        <div class="card">
+          <div class="q"><label for="obietnice">„Pierwszy lot w 3 minuty" mówi: dron z GPS sam wisi i sam hamuje, a trudna jest głównie orientacja. Czy to prawda? Czego nie powinniśmy obiecywać?</label><textarea id="obietnice" rows="3" data-k="Czy mówimy prawdę"></textarea></div>
+          <div class="q"><label for="nawyki">Czy coś w grze może nauczyć nawyku, który potem przeszkadza w realu?</label><textarea id="nawyki" rows="3" data-k="Ryzyko złych nawyków"></textarea></div>
+          <div class="q"><span class="lbl">Oceny i wskazówki po locie: trafne i sprawiedliwe?</span><div class="scale" data-k="Oceny i wskazówki"></div></div>
+          <div class="q"><label for="oceny">Uwagi do ocen i wskazówek</label><textarea id="oceny" rows="2" data-k="Oceny — uwagi"></textarea></div>
+        </div>
+
+        <h2>6 · Na koniec</h2>
+        <div class="card">
+          <div class="q"><label for="top3">Trzy rzeczy do poprawy w pierwszej kolejności</label><textarea id="top3" rows="3" data-k="Top 3 do poprawy"></textarea></div>
+          <div class="q"><span class="lbl">Czy możemy podać Cię jako konsultanta projektu?</span><div class="chips" data-k="Konsultant"><button type="button">tak</button><button type="button">nie</button><button type="button">pogadajmy</button></div></div>
+          <div class="q"><span class="lbl">Czy chcesz nagrać wzorcowy przelot („ducha instruktora"), z którym początkujący będą się porównywać?</span><div class="chips" data-k="Duch instruktora"><button type="button">chętnie</button><button type="button">może później</button><button type="button">nie</button></div></div>
+          <div class="q"><label for="podpis">Imię lub pseudonim</label><input id="podpis" type="text" maxlength="80" data-k="Podpis" /></div>
+        </div>
+      </form>
+    </main>
+
+    <div class="bar">
+      <span id="status"></span>
+      <button class="btn" id="copy" type="button">Skopiuj odpowiedzi</button>
+      <button class="btn primary" id="send" type="button">Wyślij do Jana</button>
+    </div>
+
+    <script>
+      (function () {
+        var KEY = 'futurepilot.recenzja';
+        var W3F = '41c76e7b-9154-4f68-a910-e76ae4d498f4'; // Web3Forms — ten sam jawny klucz co w formularzach futureshow.pl
+        var data = {};
+        try { data = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) {}
+        var status = document.getElementById('status');
+        function save() { try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (e) {} }
+
+        // skale 1–5
+        document.querySelectorAll('.scale').forEach(function (el) {
+          var k = el.dataset.k;
+          for (var n = 1; n <= 5; n++) (function (n) {
+            var b = document.createElement('button'); b.type = 'button'; b.textContent = n; b.setAttribute('aria-label', n + ' na 5');
+            if (data[k] === n) b.className = 'on';
+            b.addEventListener('click', function () { data[k] = n; save(); el.querySelectorAll('button').forEach(function (x) { x.classList.toggle('on', x === b); }); });
+            el.appendChild(b);
+          })(n);
+        });
+        // wybory
+        document.querySelectorAll('.chips').forEach(function (el) {
+          var k = el.dataset.k, multi = !!el.dataset.multi;
+          el.querySelectorAll('button').forEach(function (b) {
+            var v = b.textContent;
+            var cur = data[k];
+            if (multi ? (cur || []).indexOf(v) >= 0 : cur === v) b.classList.add('on');
+            b.addEventListener('click', function () {
+              if (multi) { var arr = data[k] || []; var i = arr.indexOf(v); if (i >= 0) arr.splice(i, 1); else arr.push(v); data[k] = arr; b.classList.toggle('on'); }
+              else { data[k] = v; el.querySelectorAll('button').forEach(function (x) { x.classList.toggle('on', x === b); }); }
+              save();
+            });
+          });
+        });
+        // pola tekstowe
+        document.querySelectorAll('textarea[data-k], input[data-k]').forEach(function (el) {
+          var k = el.dataset.k;
+          if (data[k]) el.value = data[k];
+          el.addEventListener('input', function () { data[k] = el.value; save(); });
+        });
+
+        function text() {
+          var order = [];
+          document.querySelectorAll('[data-k]').forEach(function (el) { if (order.indexOf(el.dataset.k) < 0) order.push(el.dataset.k); });
+          var lines = ['FuturePilot — karta recenzenta', ''];
+          order.forEach(function (k) {
+            var v = data[k];
+            if (v === undefined || v === '' || (Array.isArray(v) && !v.length)) return;
+            lines.push(k + ': ' + (Array.isArray(v) ? v.join(', ') : (typeof v === 'number' ? v + '/5' : v)));
+          });
+          lines.push('', '— ' + new Date().toLocaleString('pl-PL') + ' · ekran ' + innerWidth + '×' + innerHeight);
+          return lines.join('\n');
+        }
+
+        document.getElementById('copy').addEventListener('click', function () {
+          var t = text();
+          (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(
+            function () { status.textContent = 'Skopiowane — możesz wkleić w wiadomość.'; },
+            function () { status.textContent = 'Nie udało się skopiować. Zaznacz i skopiuj ręcznie.'; }
+          );
+        });
+
+        document.getElementById('send').addEventListener('click', function () {
+          var btn = this;
+          var filled = Object.keys(data).filter(function (k) { var v = data[k]; return v !== '' && v !== undefined && !(Array.isArray(v) && !v.length); }).length;
+          if (filled < 3) { status.textContent = 'Wypełnij choć kilka pól.'; return; }
+          btn.disabled = true; status.textContent = 'Wysyłamy…';
+          var fd = new FormData();
+          fd.append('access_key', W3F);
+          fd.append('subject', '[RECENZJA] FuturePilot — karta recenzenta');
+          fd.append('from_name', 'futureshow.pl / FuturePilot');
+          fd.append('message', text());
+          fd.append('botcheck', '');
+          fetch('https://api.web3forms.com/submit', { method: 'POST', headers: { Accept: 'application/json' }, body: fd })
+            .then(function (r) { return r.json(); })
+            .then(function (d) { if (!d.success) throw 0; status.textContent = 'Dziękujemy — recenzja doszła. Odpowiedzi zostają też zapisane tutaj.'; })
+            .catch(function () { status.textContent = 'Nie udało się wysłać. Użyj „Skopiuj odpowiedzi" i prześlij je wiadomością.'; })
+            .finally(function () { btn.disabled = false; });
+        });
+      })();
+    </script>
+  </body>
+</html>

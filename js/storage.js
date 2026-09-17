@@ -8,6 +8,8 @@ const DEFAULTS = {
   runs: [], // ostatnie przebiegi (do analizy uczenia się)
   totals: { flightSec: 0, runs: 0, sources: {} },
   variant: 0,
+  introDone: false, // czy ukończono prowadzony „Pierwszy lot"
+  poll: {}, // pewność siebie przed i po pierwszym locie (1–5) — test hipotezy „dron wydaje się trudniejszy, niż jest"
 };
 
 export const store = {
@@ -19,7 +21,7 @@ export const store = {
         this.data = { ...JSON.parse(JSON.stringify(DEFAULTS)), ...raw };
         this.data.settings = { ...DEFAULTS.settings, ...(raw.settings || {}) };
         this.data.totals = { ...DEFAULTS.totals, ...(raw.totals || {}) };
-      }
+      } else this.data = JSON.parse(JSON.stringify(DEFAULTS));
     } catch (e) {}
     return this.data;
   },

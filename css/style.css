@@ -894,3 +894,172 @@ canvas.trace {
 .trend .up {
   color: var(--ok);
 }
+
+/* ---------- prowadzony „Pierwszy lot": większy HUD i podpowiedzi przy drążkach ---------- */
+#hud.big #hud-obj {
+  font-size: clamp(15px, 2.4vw, 19px);
+}
+#hud.big #hud-sub {
+  font-size: 13.5px;
+}
+.stick[data-hint]:not([data-hint='']) {
+  opacity: 0.95;
+}
+.stick[data-hint]:not([data-hint=''])::before {
+  border-color: var(--accent);
+}
+.stick .hint {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  display: none;
+}
+.stick[data-hint]:not([data-hint='']) .hint {
+  display: block;
+}
+.stick .hint::after {
+  position: absolute;
+  left: 0;
+  top: calc(var(--r) * -1.55);
+  transform: translate(-50%, -50%);
+  white-space: nowrap;
+  font-size: 30px;
+  font-weight: 900;
+  line-height: 1;
+  color: var(--accent);
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.7);
+  animation: hintPulse 1.1s ease-in-out infinite;
+}
+.stick[data-hint='up'] .hint::after {
+  content: '▲';
+}
+.stick[data-hint='down'] .hint::after {
+  content: '▼';
+  top: calc(var(--r) * 1.55);
+}
+.stick[data-hint='right'] .hint::after {
+  content: '▶';
+  top: 0;
+  left: calc(var(--r) * 1.6);
+}
+.stick[data-hint='left'] .hint::after {
+  content: '◀';
+  top: 0;
+  left: calc(var(--r) * -1.6);
+}
+.stick[data-hint='side'] .hint::after {
+  content: '◀ ▶';
+  font-size: 24px;
+}
+.stick[data-hint='any'] .hint::after {
+  content: 'steruj';
+  font-size: 15px;
+}
+.stick[data-hint='release'] .hint::after {
+  content: 'puść';
+  font-size: 16px;
+}
+.stick[data-hint='tap'] .hint::after {
+  content: 'dotknij tutaj';
+  font-size: 15px;
+}
+@keyframes hintPulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .stick .hint::after {
+    animation: none;
+  }
+}
+
+/* ---------- wersja testowa, ankieta, opinia ---------- */
+.testnote {
+  font-size: 13px;
+  color: var(--muted);
+  margin: -6px 0 14px;
+}
+.testnote .badge {
+  margin-right: 6px;
+}
+button.link {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  padding: 6px 2px;
+  font-weight: 650;
+}
+.poll .pollrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.poll button {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--panel2);
+  font-weight: 800;
+  font-size: 17px;
+}
+.poll button.on {
+  background: var(--accent);
+  color: #1a1204;
+  border-color: transparent;
+}
+.checks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--muted);
+}
+.checks li.ok {
+  color: var(--text);
+}
+.checks li.ok::first-letter {
+  color: var(--ok);
+}
+.card a {
+  color: var(--accent);
+}
+.fld {
+  display: block;
+  font-size: 13.5px;
+  margin: 12px 0 0;
+  color: var(--muted);
+}
+.fld textarea,
+.fld input {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  padding: 11px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: #0d1626;
+  color: var(--text);
+  font: inherit;
+  font-size: 16px; /* 16 px: iOS nie przybliża strony przy wpisywaniu */
+  -webkit-user-select: text;
+  user-select: text;
+  resize: vertical;
+}
+.fld textarea:focus,
+.fld input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}

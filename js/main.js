@@ -13,6 +13,8 @@ const ZERO = { throttle: 0, yaw: 0, pitch: 0, roll: 0 };
 const coarse = window.matchMedia('(pointer: coarse)').matches;
 const fmt = (x, d = 1) => x.toFixed(d).replace('.', ',');
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const VERSION = '0.1.3';
+const W3F_KEY = '41c76e7b-9154-4f68-a910-e76ae4d498f4'; // Web3Forms — ten sam jawny klucz co w formularzach futureshow.pl
 const SRC_LABEL = { touch: 'dotyk', gamepad: 'gamepad', radio: 'aparatura RC', keyboard: 'klawiatura', auto: 'autopilot' };
 
 store.load();
@@ -222,19 +224,28 @@ function showMenu() {
     </button>`;
   }).join('');
   show(`
-    <div class="brand"><h1>FUTURE<b>PILOT</b></h1><small>trener operatora drona · prototyp 0.1</small></div>
-    <p class="lead">Pięć minut dziennie. Krótkie ćwiczenia uczą tego, co naprawdę przenosi się na prawdziwego drona: układu drążków, orientacji, płynności ruchów i procedur.</p>
-    <div class="card daily">
+    <div class="brand"><h1>FUTURE<b>PILOT</b></h1><small>sprawdź, czy umiesz sterować dronem</small></div>
+    <p class="lead">Dron wydaje się trudny. Sprawdź to w trzy minuty — bez sprzętu, bez instalacji i bez ryzyka. Potem krótkie ćwiczenia uczą tego, co naprawdę przenosi się na prawdziwego drona.</p>
+    <p class="testnote"><span class="badge">WERSJA TESTOWA ${VERSION}</span> Pomóż nam ją ulepszyć — <button class="link" data-act="feedback">prześlij opinię</button>.</p>
+    ${
+      store.data.introDone
+        ? `<div class="card daily">
       <div><h3>Trening dnia · około 6 minut</h3><p>${planNames}</p></div>
       <button class="btn primary" data-act="daily">Zaczynam</button>
-    </div>
+    </div>`
+        : `<div class="card daily">
+      <div><h3>Pierwszy lot w 3 minuty</h3><p>Bez ocen i bez pośpiechu: start, zawis, przelot, obrót i lądowanie — krok po kroku.</p></div>
+      <button class="btn primary" data-act="intro">Zaczynam</button>
+    </div>`
+    }
     <h2>Ćwiczenia</h2>
     <div class="grid">${cards}</div>
     <div class="foot">
       <button class="btn small" data-act="profile">Profil umiejętności</button>
       <button class="btn small" data-act="settings">Ustawienia</button>
       <button class="btn small" data-act="about">O projekcie</button>
-      <span class="note" style="align-self:center">${t.runs ? `${t.runs} ${plural(t.runs, 'lot', 'loty', 'lotów')} · ${mins} ${plural(mins, 'minuta', 'minuty', 'minut')} w powietrzu` : 'Pierwszy raz? Zacznij od „Treningu dnia".'}</span>
+      ${store.data.introDone ? '<button class="btn small" data-act="intro">Pierwszy lot jeszcze raz</button>' : ''}
+      <span class="note" style="align-self:center">${t.runs ? `${t.runs} ${plural(t.runs, 'lot', 'loty', 'lotów')} · ${mins} ${plural(mins, 'minuta', 'minuty', 'minut')} w powietrzu` : 'Pierwszy raz? Zacznij od „Pierwszego lotu".'}</span>
     </div>`);
 }
 
@@ -297,6 +308,156 @@ function showBrief(id, level) {
         </div>
       </div>
     </div>`);
+}
+
+// pytanie o pewność siebie (1–5) przed i po pierwszym locie — sprawdza, czy „dron jest trudny" to mit
+function pollHtml(which) {
+  const cur = (store.data.poll || {})[which];
+  const btns = [1, 2, 3, 4, 5].map((n) => `<button data-act="poll" data-k="${which}" data-v="${n}" class="${cur === n ? 'on' : ''}" aria-label="${n} na 5">${n}</button>`).join('');
+  return `<div class="poll"><div class="pollrow"><span>zdecydowanie nie</span>${btns}<span>zdecydowanie tak</span></div></div>`;
+}
+
+function showIntroBrief() {
+  app.state = 'brief';
+  app.D = drillById('intro');
+  app.level = 1;
+  app.playlist = null;
+  const how = coarse
+    ? 'Telefon trzymaj poziomo, kciuki w dolnych rogach ekranu. Drążek pojawi się tam, gdzie dotkniesz.'
+    : 'Na komputerze sterujesz klawiaturą: W i S to góra–dół, A i D to obrót, strzałki to lot. Możesz też podłączyć gamepad.';
+  show(`
+    <div class="card" style="max-width:720px;margin:0 auto">
+      <div class="kicker">Dla każdego · około 3 minut</div>
+      <h1 style="margin:4px 0 8px">Pierwszy lot</h1>
+      <p>Polecisz dronem z GPS — takim jak popularne drony z kamerą. Przejdziemy razem start, zawis, przelot, obrót i lądowanie. Nie ma ocen ani limitu prób, a kraksy są tu za darmo.</p>
+      <p class="note">${how}</p>
+      <h2>Zanim zaczniesz: czy czujesz, że dasz radę sterować prawdziwym dronem?</h2>
+      ${pollHtml('before')}
+      <div class="row end" style="margin-top:14px">
+        <button class="btn" data-act="menu">Wróć</button>
+        <button class="btn primary" data-act="start">Lecimy</button>
+      </div>
+    </div>`);
+}
+
+function pollSummary() {
+  const p = store.data.poll || {};
+  if (!p.before || !p.after) return '';
+  const d = p.after - p.before;
+  const txt = d > 0 ? `Przed lotem ${p.before}/5, po locie ${p.after}/5. Dron okazał się łatwiejszy, niż się wydawał.` : d === 0 ? `Przed lotem ${p.before}/5 i po locie ${p.after}/5 — twoje przeczucie się potwierdziło.` : `Przed lotem ${p.before}/5, po locie ${p.after}/5. Napisz nam, co sprawiło trudność — to dla nas najcenniejsza uwaga.`;
+  return `<p class="trend" style="max-width:none">${txt}</p>`;
+}
+
+function showIntroResult(res) {
+  app.state = 'result';
+  setFlightUi(false);
+  const list = res.steps.map((x) => `<li class="${x.done ? 'ok' : ''}">${x.done ? '✓' : '○'} ${esc(x.label)}</li>`).join('');
+  const secs = Math.round(res.time);
+  show(
+    `
+    <div class="card" style="max-width:760px;margin:0 auto">
+      <div class="kicker">Pierwszy lot · ${Math.floor(secs / 60)} min ${secs % 60} s</div>
+      <h1 style="margin:4px 0 10px">${res.completed ? 'Pierwszy lot za tobą' : 'Dobry początek'}</h1>
+      <div class="cols" style="margin-top:0">
+        <ul class="checks">${list}</ul>
+        <div>
+          <p>${res.completed ? '<b>Tyle wystarczy na spokojny lot dronem z GPS na otwartym polu.</b> Prawdziwy dron tak samo wisi w miejscu i sam hamuje. Reszta to przepisy, rozsądek i wprawa.' : 'Nie wszystko się udało i to normalne — większość osób potrzebuje dwóch, trzech podejść. Spróbuj jeszcze raz: pójdzie wyraźnie łatwiej.'}</p>
+          <p class="note">Zanim polecisz naprawdę: w Polsce latać można od 14. roku życia, a szkolenie i egzamin online są darmowe. Szczegóły: <a href="https://ulc.gov.pl/drony/kategoria-otwarta-informacje" target="_blank" rel="noopener">Urząd Lotnictwa Cywilnego — kategoria otwarta</a> i <a href="https://drony.gov.pl/" target="_blank" rel="noopener">drony.gov.pl</a>.</p>
+        </div>
+      </div>
+      <h2>A teraz: czy czujesz, że dasz radę sterować prawdziwym dronem?</h2>
+      ${pollHtml('after')}
+      <div id="poll-summary">${pollSummary()}</div>
+      <div class="foot row end">
+        <button class="btn" data-act="feedback">Prześlij opinię</button>
+        <button class="btn" data-act="retry">Jeszcze raz</button>
+        <button class="btn primary" data-act="menu">${res.completed ? 'Dalej: ćwiczenia' : 'Menu'}</button>
+      </div>
+    </div>`,
+    true
+  );
+}
+
+function platformName() {
+  const ua = navigator.userAgent || '';
+  if (/iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && coarse)) return 'iOS';
+  if (/Android/.test(ua)) return 'Android';
+  return 'komputer';
+}
+
+// dane techniczne dołączane do opinii — pokazywane użytkownikowi wprost, nic ukrytego
+function feedbackContext() {
+  const p = store.data.poll || {};
+  const t = store.data.totals;
+  const used = Object.keys(t.sources || {}).map((k) => SRC_LABEL[k] || k);
+  return [
+    `wersja ${VERSION}`,
+    platformName(),
+    `ekran ${window.innerWidth}×${window.innerHeight}`,
+    `sterowanie: ${used.length ? used.join(', ') : coarse ? 'dotyk' : 'klawiatura'}`,
+    `pierwszy lot: ${store.data.introDone ? 'ukończony' : 'nieukończony'}`,
+    `pewność przed/po: ${p.before || '–'}/${p.after || '–'}`,
+    `loty treningowe: ${t.runs}`,
+  ].join(' · ');
+}
+
+function showFeedback() {
+  app.state = 'other';
+  setFlightUi(false);
+  show(`
+    <div class="card" style="max-width:680px;margin:0 auto">
+      <div class="kicker">Wersja testowa ${VERSION}</div>
+      <h1 style="margin:4px 0 8px">Prześlij opinię</h1>
+      <p class="note">Każda uwaga pomaga — zwłaszcza o tym, co było niejasne, niewygodne albo zaskakująco łatwe.</p>
+      <label class="fld">Co chcesz nam powiedzieć?
+        <textarea id="fb-msg" rows="5" maxlength="2000" placeholder="Na przykład: drążki były za małe, nie było widać, gdzie dron ma przód, fajne było…"></textarea>
+      </label>
+      <label class="fld">Kontakt, jeśli chcesz odpowiedzi (nieobowiązkowo)
+        <input id="fb-contact" type="text" maxlength="120" autocomplete="email" placeholder="e-mail" />
+      </label>
+      <p class="note">Do opinii dołączymy tylko dane techniczne: ${esc(feedbackContext())}.</p>
+      <p id="fb-status" class="note" aria-live="polite"></p>
+      <div class="row end">
+        <button class="btn" data-act="menu">Wróć</button>
+        <button class="btn" data-act="fb-copy">Skopiuj treść</button>
+        <button class="btn primary" data-act="fb-send">Wyślij</button>
+      </div>
+    </div>`);
+}
+
+function feedbackText() {
+  const msg = ($('#fb-msg') || {}).value || '';
+  const contact = ($('#fb-contact') || {}).value || '';
+  return { msg: msg.trim(), contact: contact.trim(), full: `${msg.trim()}\n\n— ${feedbackContext()}${contact.trim() ? `\nKontakt: ${contact.trim()}` : ''}` };
+}
+
+async function sendFeedback(btn) {
+  const st = $('#fb-status');
+  const f = feedbackText();
+  if (f.msg.length < 3) {
+    st.textContent = 'Napisz choć jedno zdanie.';
+    return;
+  }
+  btn.disabled = true;
+  st.textContent = 'Wysyłamy…';
+  try {
+    const fd = new FormData();
+    fd.append('access_key', W3F_KEY);
+    fd.append('subject', '[OPINIA] FuturePilot — wersja testowa');
+    fd.append('from_name', 'futureshow.pl / FuturePilot');
+    fd.append('message', f.full);
+    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.contact)) fd.append('email', f.contact);
+    fd.append('botcheck', '');
+    const r = await fetch('https://api.web3forms.com/submit', { method: 'POST', headers: { Accept: 'application/json' }, body: fd });
+    const d = await r.json();
+    if (!d.success) throw new Error('odrzucone');
+    st.textContent = 'Dziękujemy — opinia doszła.';
+    $('#fb-msg').value = '';
+  } catch (e) {
+    st.textContent = 'Nie udało się wysłać. Skopiuj treść i napisz na futureshow@proton.me.';
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 function qColor(g) {
@@ -507,7 +668,8 @@ function showAbout() {
       <p><b>Co się przenosi na prawdziwego drona?</b> Układ i kierunki drążków, zrozumienie trybów lotu, orientacja (zwłaszcza lot „na siebie"), koordynacja obu rąk, nawyk płynnych, proporcjonalnych ruchów, czytanie sytuacji i procedury.</p>
       <p><b>Czego ekran dotykowy nie da?</b> Czucia sprężyn i precyzji prawdziwych drążków. Dlatego gra obsługuje także gamepady i aparatury RC, a wyniki zapisuje osobno dla każdego sposobu sterowania.</p>
       <p><b>Jak ćwiczyć?</b> Krótko i regularnie: 5–10 minut dziennie daje więcej niż godzina raz w tygodniu. Poziomy stopniowo zabierają ułatwienia: GPS → STABILNY → ANGLE → ACRO, potem wiatr i ciaśniejsze tolerancje.</p>
-      <p class="note">Wersja 0.1 — fizyka jest uproszczona, a progi ocen wymagają kalibracji na testach z ludźmi. Żadne dane nie opuszczają urządzenia.</p>
+      <p class="note">Wersja testowa ${VERSION} — fizyka jest uproszczona, a progi ocen wymagają kalibracji na testach z ludźmi. Postępy zapisują się wyłącznie na tym urządzeniu; do nas trafia tylko to, co samodzielnie wyślesz w formularzu opinii.</p>
+      <p><button class="btn small" data-act="feedback">Prześlij opinię</button></p>
     </div>`);
 }
 
@@ -556,6 +718,23 @@ screens.addEventListener('click', (e) => {
   else if (act === 'profile') showProfile();
   else if (act === 'settings') showSettings();
   else if (act === 'about') showAbout();
+  else if (act === 'intro') showIntroBrief();
+  else if (act === 'feedback') showFeedback();
+  else if (act === 'fb-send') sendFeedback(b);
+  else if (act === 'fb-copy') {
+    const st = $('#fb-status');
+    const txt = feedbackText().full;
+    (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(
+      () => (st.textContent = 'Skopiowane do schowka.'),
+      () => (st.textContent = 'Nie udało się skopiować — zaznacz tekst ręcznie.')
+    );
+  } else if (act === 'poll') {
+    store.data.poll = { ...(store.data.poll || {}), [b.dataset.k]: +b.dataset.v, ts: Date.now() };
+    store.save();
+    b.parentElement.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
+    const ps = $('#poll-summary');
+    if (ps) ps.innerHTML = pollSummary();
+  }
   else if (act === 'wizard') showWizard();
   else if (act === 'reset') {
     if (confirm('Wyzerować wszystkie postępy na tym urządzeniu?')) {
@@ -595,7 +774,10 @@ function setFlightUi(on) {
   hudEl.root.hidden = !on;
   input.setEnabled(on);
   $('#countdown').hidden = true;
-  if (!on) releaseWake();
+  if (!on) {
+    releaseWake();
+    ctx.hint('', '');
+  }
 }
 
 const ctx = {
@@ -608,6 +790,14 @@ const ctx = {
   sticks: ZERO,
   freeze: false,
   variant: 0,
+  coarse,
+  // podpowiedź przy drążku: 'up' | 'down' | 'left' | 'right' | 'side' | 'release' | 'tap' | 'any' | ''
+  hint(L, R) {
+    const a = $('#stickL'),
+      b = $('#stickR');
+    if (a.dataset.hint !== (L || '')) a.dataset.hint = L || '';
+    if (b.dataset.hint !== (R || '')) b.dataset.hint = R || '';
+  },
   buzz(ms) {
     vibrate(ms);
     audio.beep(990, 0.07);
@@ -681,7 +871,10 @@ function startDrill(id, level) {
     `<kbd>↑</kbd><kbd>↓</kbd> przód / tył · <kbd>←</kbd><kbd>→</kbd> lewo / prawo · <kbd>Shift</kbd> delikatnie<br>` +
     `<kbd>P</kbd> pauza · <kbd>R</kbd> od nowa${drill.view === 'los' ? ' · <kbd>V</kbd> widok' : ''}`;
   hudEl.osd.hidden = !(drill.view === 'fpv' || drill.view === 'cam');
-  $('#btn-view').hidden = drill.view !== 'los';
+  $('#btn-view').hidden = drill.view !== 'los' || !!D.intro;
+  hudEl.root.classList.toggle('big', !!D.intro);
+  hudEl.timer.hidden = !!D.intro;
+  ctx.hint('', '');
   hideScreens();
   setFlightUi(true);
   app.acc = 0;
@@ -710,8 +903,17 @@ function endDrill() {
   const res = drill.result(ctx);
   const used = [...input.sourcesUsed].filter((s) => s !== 'auto');
   const source = used.includes('radio') ? 'radio' : used.includes('gamepad') ? 'gamepad' : used.includes('touch') ? 'touch' : used[0] || (coarse ? 'touch' : 'keyboard');
-  const rec = store.recordRun(app.D.id, app.level, res, source, drill.t);
   app.lastResult = res;
+  if (app.D.intro) {
+    store.data.introDone = store.data.introDone || res.completed;
+    store.data.totals.flightSec += drill.t;
+    store.data.totals.sources[source] = (store.data.totals.sources[source] || 0) + 1;
+    store.save();
+    audio.chord(res.completed ? [660, 880, 1320] : [660, 880]);
+    showIntroResult(res);
+    return;
+  }
+  const rec = store.recordRun(app.D.id, app.level, res, source, drill.t);
   if (res.stars >= 2) audio.chord([660, 880, 1320]);
   else if (res.completed) audio.chord([660, 880]);
   else audio.chord([330, 247]);
@@ -779,8 +981,8 @@ function step(dt, render = true) {
     drill.t += dt;
     if (sim.crashed) {
       if (app.crashT === 0) {
-        drill.onCrash(ctx);
-        hud.flash(sim.crashReason || 'Kraksa', 'bad', 1200);
+        const crashMsg = drill.onCrash(ctx);
+        hud.flash(crashMsg || sim.crashReason || 'Kraksa', crashMsg ? 'info' : 'bad', 1200);
         vibrate([30, 40, 60]);
         audio.beep(140, 0.3, 0.09);
       }

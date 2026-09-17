@@ -113,6 +113,7 @@ export class Input {
 
     window.addEventListener('keydown', (e) => {
       if (e.repeat) return;
+      if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return; // pisanie w formularzu to nie sterowanie
       this.keys.add(e.code);
       this._lastKeyActivity = performance.now();
     });

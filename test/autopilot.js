@@ -131,6 +131,25 @@ const POLICIES = {
     const aim = rel < -5 || lat > 0.7 ? { x: G.x - fx * 4.5, y: G.y, z: G.z - fz * 4.5 } : { x: G.x + fx * 3, y: G.y, z: G.z + fz * 3 };
     return flyTo(fp, aim, { heading: G.h, vmax: 3.5 });
   },
+  // prowadzony „Pierwszy lot": autopilot wykonuje kolejne polecenia tak, jak zrobiłby to człowiek
+  intro(fp, d) {
+    const s = fp.sim;
+    const Z = { throttle: 0, yaw: 0, pitch: 0, roll: 0 };
+    const id = d.steps[Math.min(d.k, d.steps.length - 1)].id;
+    if (s.landed && ['przod', 'bok', 'obrot', 'powrot'].includes(id)) return { ...Z, throttle: 0.8 };
+    if (id === 'start') return { ...Z, throttle: 0.8 };
+    if (id === 'zawis') return s.landed ? { ...Z, throttle: 0.8 } : Z;
+    if (id === 'przod') return d.braking ? Z : flyTo(fp, { x: d.A.x, y: 2.6, z: d.A.z }, { heading: 0 });
+    if (id === 'bok') return flyTo(fp, { x: d.B.x, y: 2.6, z: d.B.z }, { heading: 0 });
+    if (id === 'obrot') return flyTo(fp, { x: s.p.x, y: 2.6, z: s.p.z }, { heading: Math.atan2(s.p.x, s.p.z) });
+    if (id === 'powrot') return flyTo(fp, { x: d.S.x, y: 2.6, z: d.S.z });
+    if (id === 'ladowanie') {
+      const c = flyTo(fp, { x: d.S.x, y: 0, z: d.S.z });
+      c.throttle = -0.5;
+      return c;
+    }
+    return Z;
+  },
   orbit(fp, d) {
     const s = fp.sim;
     const dx = d.poi.x - s.p.x,
@@ -170,7 +189,12 @@ export async function runDrill(id, level, { maxSec = 200, dt = 1 / 60, noise = 0
       st.roll = clamp(st.roll + rnd() * noise, -1, 1);
     }
     if (clumsy && fp.app.state === 'flying') {
-      if (!held || heldN <= 0) {
+      const released = Math.abs(st.throttle) + Math.abs(st.yaw) + Math.abs(st.pitch) + Math.abs(st.roll) < 0.01;
+      if (released) {
+        // puszczenie drążków człowiek wykonuje dokładnie (kciuki w górę = zera), więc bez szumu
+        held = { throttle: 0, yaw: 0, pitch: 0, roll: 0 };
+        heldN = 0;
+      } else if (!held || heldN <= 0) {
         held = {
           throttle: clamp(st.throttle * 1.3 + rnd() * 0.2, -1, 1),
           yaw: clamp(st.yaw * 1.4 + rnd() * 0.25, -1, 1),
@@ -226,3 +250,6 @@ export async function runAll(levels = null) {
   fp.showMenu();
   return out;
 }
+
+// dostęp do pojedynczych strategii (np. do pokazu wzorcowego przelotu albo testów krok po kroku)
+export const policies = POLICIES;

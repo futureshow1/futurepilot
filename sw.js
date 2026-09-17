@@ -1,10 +1,11 @@
 // FuturePilot — service worker.
 // Strategia „najpierw sieć, potem pamięć": online zawsze świeża wersja (prototyp często się zmienia),
 // offline — ostatnia pobrana. Dzięki temu po instalacji na ekranie głównym gra działa bez internetu.
-const CACHE = 'futurepilot-v0.1.2';
+const CACHE = 'futurepilot-v0.1.3';
 const ASSETS = [
   './',
   './index.html',
+  './recenzja.html',
   './manifest.webmanifest',
   './css/style.css',
   './js/main.js',

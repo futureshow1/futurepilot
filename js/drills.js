@@ -943,6 +943,171 @@ export class DrillLanding extends Drill {
   }
 }
 
+// =====================================================================================
+// 0. PIERWSZY LOT W 3 MINUTY — prowadzony wstęp dla każdego (bez ocen, bez pośpiechu)
+//    Cel: rozbić mit „dron jest trudny". Dron z GPS sam wisi w miejscu i sam hamuje — to ma być
+//    pierwsze, co człowiek poczuje pod kciukami. Jedyna naprawdę trudna rzecz (lot „nosem do siebie")
+//    pojawia się na końcu, nazwana po imieniu.
+// =====================================================================================
+export class DrillFirstFlight extends Drill {
+  static id = 'intro';
+  static title = 'Pierwszy lot w 3 minuty';
+  static skill = 'alt';
+  static intro = true;
+  static goal = 'Start, zawis, przelot, obrót i lądowanie — krok po kroku.';
+  static why = '';
+  static levels = [{ mode: 'gps', limit: 240 }];
+  start() {
+    return { pos: { x: 0, y: 0, z: -6 }, heading: 0, airborne: false };
+  }
+  setup(ctx) {
+    ctx.wind.set(0, 0, 0);
+    this.S = { x: 0, z: -6 };
+    this.A = { x: 0, z: -14 };
+    this.B = { x: 6, z: -14 };
+    ctx.world.addPad(this.S.x, this.S.z, 1.2, 'S');
+    this.arrow = ctx.world.addGroundArrow(0xffffff);
+    this.k = 0;
+    this.holdT = 0;
+    this.braking = false;
+    this.zone = null;
+    this.zoneAt = null;
+    const START = { t: 'Lewy kciuk do góry — startuj', k: 'Przytrzymaj W — startuj', g: 'Lewy drążek do góry — startuj' };
+    this.startText = START;
+    this.steps = [
+      { id: 'kciuki', label: 'Kciuki na ekranie', touchOnly: true, text: { t: 'Połóż oba kciuki na ekranie: jeden po lewej, drugi po prawej' }, sub: 'Drążek pojawia się tam, gdzie dotkniesz', hint: ['tap', 'tap'] },
+      { id: 'start', label: 'Start', text: START, sub: 'Wznieś się na 2–3 metry', hint: ['up', ''] },
+      { id: 'zawis', label: 'Zawis bez trzymania drążków', text: { t: 'A teraz puść oba kciuki', k: 'A teraz puść klawisze', g: 'A teraz puść oba drążki' }, sub: 'Dron z GPS sam trzyma miejsce — prawdziwy robi to samo', hint: ['release', 'release'] },
+      { id: 'przod', label: 'Lot do przodu i hamowanie', zone: 'A', text: { t: 'Prawy kciuk do góry — leć do zielonej strefy', k: 'Strzałka ↑ — leć do zielonej strefy', g: 'Prawy drążek od siebie — leć do zielonej strefy' }, sub: '', hint: ['', 'up'] },
+      { id: 'bok', label: 'Lot w bok', zone: 'B', text: { t: 'Prawy kciuk w prawo — leć bokiem do następnej strefy', k: 'Strzałka → — leć bokiem do następnej strefy', g: 'Prawy drążek w prawo — leć bokiem do następnej strefy' }, sub: '', hint: ['', 'right'] },
+      { id: 'obrot', label: 'Obrót przodem do siebie', text: { t: 'Lewy kciuk w bok — obróć drona przodem do siebie', k: 'A albo D — obróć drona przodem do siebie', g: 'Lewy drążek w bok — obróć drona przodem do siebie' }, sub: 'Przód drona: pomarańczowe pierścienie i białe światła. Strzałka na ziemi pokazuje, dokąd patrzy.', hint: ['side', ''] },
+      { id: 'powrot', label: 'Powrót „nosem do siebie"', zone: 'S', text: { t: 'Uwaga: teraz lewo i prawo są zamienione. Wróć nad lądowisko S', k: 'Uwaga: teraz lewo i prawo są zamienione. Wróć nad lądowisko S', g: 'Uwaga: teraz lewo i prawo są zamienione. Wróć nad lądowisko S' }, sub: 'Za trudne? Obróć drona tyłem do siebie — piloci też tak robią.', hint: ['', 'any'] },
+      { id: 'ladowanie', label: 'Lądowanie', text: { t: 'Lewy kciuk w dół — ląduj powoli', k: 'Przytrzymaj S — ląduj', g: 'Lewy drążek w dół — ląduj' }, sub: 'Blisko ziemi dron sam zwalnia', hint: ['down', ''] },
+    ];
+    this.done = false;
+    this.doneIds = new Set();
+  }
+  _kind(ctx) {
+    const s = ctx.input.source;
+    if (s === 'gamepad' || s === 'radio') return 'g';
+    if (s === 'keyboard') return 'k';
+    return ctx.coarse ? 't' : 'k';
+  }
+  _setZone(ctx, name) {
+    if (this.zoneAt === name) return;
+    if (this.zone) ctx.world.drillGroup.remove(this.zone);
+    this.zone = null;
+    this.zoneAt = name;
+    if (name) this.zone = ctx.world.addZone(this[name].x, this[name].z, name === 'S' ? 1.9 : 1.7, 1, 7);
+  }
+  _next(ctx, flash) {
+    this.doneIds.add(this.steps[this.k].id);
+    this.k++;
+    this.holdT = 0;
+    this.braking = false;
+    ctx.buzz(10);
+    if (flash) ctx.hud.flash(flash, 'ok', 1500);
+    if (this.k >= this.steps.length) {
+      ctx.hint('', '');
+      ctx.hud.flash('Pierwszy lot za tobą!', 'ok', 1800);
+      this.finish(true);
+    }
+  }
+  update(dt, ctx) {
+    const s = ctx.sim,
+      st = ctx.sticks;
+    const kind = this._kind(ctx);
+    let step = this.steps[this.k];
+    if (step.touchOnly && kind !== 't') {
+      this.k++;
+      step = this.steps[this.k];
+    }
+    this.arrow.position.set(s.p.x, 0.05, s.p.z);
+    this.arrow.rotation.y = s.heading;
+    this.arrow.visible = step.id === 'obrot' || step.id === 'powrot';
+    const neutral = Math.abs(st.throttle) < 0.15 && Math.abs(st.yaw) < 0.15 && Math.abs(st.pitch) < 0.15 && Math.abs(st.roll) < 0.15;
+    const inZone = (p, r) => Math.hypot(s.p.x - p.x, s.p.z - p.z) <= r && s.altitude > 0.8;
+    this._setZone(ctx, step.zone || null);
+    let text = step.text[kind] || step.text.t || step.text.k;
+    let sub = step.sub;
+    let hint = step.hint;
+    const needsAir = ['przod', 'bok', 'obrot', 'powrot'].includes(step.id);
+    if (needsAir && s.landed) {
+      text = this.startText[kind];
+      sub = 'Dron stoi na ziemi — wystartuj jeszcze raz';
+      hint = ['up', ''];
+    } else if (step.id === 'kciuki') {
+      if (ctx.input.sticks.L.active && ctx.input.sticks.R.active) this._next(ctx, 'Dobrze!');
+    } else if (step.id === 'start') {
+      if (s.altitude > 1.8) this._next(ctx);
+    } else if (step.id === 'zawis') {
+      if (!s.landed && neutral) this.holdT += dt;
+      else this.holdT = 0;
+      if (s.landed) {
+        text = this.startText[kind];
+        hint = ['up', ''];
+      }
+      if (this.holdT > 2.4) this._next(ctx, 'Wisi sam!');
+    } else if (step.id === 'przod') {
+      if (!this.braking && inZone(this.A, 1.7)) this.braking = true;
+      if (this.braking) {
+        text = kind === 't' ? 'Puść kciuk — dron sam wyhamuje' : kind === 'k' ? 'Puść klawisz — dron sam wyhamuje' : 'Puść drążek — dron sam wyhamuje';
+        hint = ['', 'release'];
+        this.holdT = neutral ? this.holdT + dt : 0;
+        if (this.holdT > 1.1) this._next(ctx, 'Sam zahamował');
+      }
+    } else if (step.id === 'bok') {
+      if (inZone(this.B, 1.7)) this._next(ctx, 'Świetnie');
+    } else if (step.id === 'obrot') {
+      const want = Math.atan2(s.p.x - PILOT.x, s.p.z - PILOT.z);
+      let d = Math.abs(want - s.heading) % (2 * Math.PI);
+      if (d > Math.PI) d = 2 * Math.PI - d;
+      this.holdT = d < 25 * DEG ? this.holdT + dt : 0;
+      if (this.holdT > 0.8) this._next(ctx, 'Patrzy na ciebie');
+    } else if (step.id === 'powrot') {
+      if (inZone(this.S, 1.9)) this._next(ctx, 'To była najtrudniejsza część');
+    } else if (step.id === 'ladowanie') {
+      const dS = Math.hypot(s.p.x - this.S.x, s.p.z - this.S.z);
+      if (s.landed && dS < 3.2) this._next(ctx);
+      else if (s.landed) {
+        text = this.startText[kind];
+        sub = 'To za daleko od lądowiska S — wystartuj i podleć bliżej';
+        hint = ['up', ''];
+      }
+    }
+    if (this.done) return;
+    if (this.zone) {
+      const p = this[this.zoneAt];
+      const inside = inZone(p, this.zoneAt === 'S' ? 1.9 : 1.7);
+      ctx.world.setZoneColor(this.zone, inside ? 0x3ddc84 : 0xffb020, inside ? 0.28 : 0.16);
+      ctx.hud.marker(V(p.x, 2.6, p.z), this.zoneAt);
+    } else ctx.hud.marker(null);
+    ctx.hud.objective(text);
+    ctx.hud.sub(sub);
+    ctx.hud.progress(this.k / this.steps.length);
+    ctx.hint(hint[0], hint[1]);
+  }
+  onCrash(ctx) {
+    this.crashes++;
+    return 'Nic się nie stało — tu kraksy są za darmo';
+  }
+  respawn() {
+    const id = this.steps[Math.min(this.k, this.steps.length - 1)].id;
+    const air = (p, heading = 0) => ({ pos: { x: p.x, y: 2.6, z: p.z }, heading, airborne: true });
+    if (id === 'przod') return air(this.S);
+    if (id === 'bok') return air(this.A);
+    if (id === 'obrot') return air(this.B);
+    if (id === 'powrot') return air(this.B, Math.atan2(this.B.x - PILOT.x, this.B.z - PILOT.z));
+    if (id === 'ladowanie') return air(this.S);
+    return this.start();
+  }
+  result(ctx) {
+    const kind = this._kind(ctx);
+    const steps = this.steps.filter((x) => !(x.touchOnly && kind !== 't')).map((x) => ({ label: x.label, done: this.doneIds.has(x.id) }));
+    return { intro: true, completed: this.completed, steps, time: this.t, crashes: this.crashes, score: 0, stars: 0, metrics: [], tips: [] };
+  }
+}
+
 export const DRILLS = [DrillAltitude, DrillHover, DrillSquare, DrillLanding, DrillOrientation, DrillEight, DrillGates, DrillOrbit];
-export const drillById = (id) => DRILLS.find((d) => d.id === id);
+export const drillById = (id) => (id === 'intro' ? DrillFirstFlight : DRILLS.find((d) => d.id === id));
 export { PILOT };
