@@ -165,7 +165,7 @@
             if (v === undefined || v === '' || (Array.isArray(v) && !v.length)) return;
             lines.push(k + ': ' + (Array.isArray(v) ? v.join(', ') : (typeof v === 'number' ? v + '/5' : v)));
           });
-          lines.push('', '— ' + new Date().toLocaleString('pl-PL') + ' · ekran ' + innerWidth + '×' + innerHeight);
+          lines.push('', '— ' + new Date().toLocaleString('pl-PL') + ' · ekran ' + innerWidth + '×' + innerHeight + ' · ' + navigator.userAgent);
           return lines.join('\n');
         }
 

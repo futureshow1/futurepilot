@@ -6,6 +6,7 @@ import { Telemetry } from './telemetry.js';
 import { DRILLS, drillById, SKILLS, plural } from './drills.js';
 import { store } from './storage.js';
 import { MotorAudio } from './audio.js';
+import { inAppBrowser, chromeIntentUrl, envSnapshot, formatReport, verdicts, loadHighEntropy, browserInfo } from './diag.js';
 
 const $ = (s) => document.querySelector(s);
 const PHYS_DT = 1 / 240;
@@ -13,7 +14,7 @@ const ZERO = { throttle: 0, yaw: 0, pitch: 0, roll: 0 };
 const coarse = window.matchMedia('(pointer: coarse)').matches;
 const fmt = (x, d = 1) => x.toFixed(d).replace('.', ',');
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-const VERSION = '0.1.3';
+const VERSION = '0.1.4';
 const W3F_KEY = '41c76e7b-9154-4f68-a910-e76ae4d498f4'; // Web3Forms — ten sam jawny klucz co w formularzach futureshow.pl
 const SRC_LABEL = { touch: 'dotyk', gamepad: 'gamepad', radio: 'aparatura RC', keyboard: 'klawiatura', auto: 'autopilot' };
 
@@ -36,6 +37,9 @@ const app = {
   crashT: 0,
   assistView: false,
   lastResult: null,
+  portrait: false,
+  bench: null, // trwający pomiar płynności (test zgodności)
+  lastBench: null,
 };
 
 // ------------------------------------------------------------------ ustawienia
@@ -227,6 +231,7 @@ function showMenu() {
     <div class="brand"><h1>FUTURE<b>PILOT</b></h1><small>sprawdź, czy umiesz sterować dronem</small></div>
     <p class="lead">Dron wydaje się trudny. Sprawdź to w trzy minuty — bez sprzętu, bez instalacji i bez ryzyka. Potem krótkie ćwiczenia uczą tego, co naprawdę przenosi się na prawdziwego drona.</p>
     <p class="testnote"><span class="badge">WERSJA TESTOWA ${VERSION}</span> Pomóż nam ją ulepszyć — <button class="link" data-act="feedback">prześlij opinię</button>.</p>
+    ${envTipsHtml()}
     ${
       store.data.introDone
         ? `<div class="card daily">
@@ -323,7 +328,7 @@ function showIntroBrief() {
   app.level = 1;
   app.playlist = null;
   const how = coarse
-    ? 'Telefon trzymaj poziomo, kciuki w dolnych rogach ekranu. Drążek pojawi się tam, gdzie dotkniesz.'
+    ? 'Sterujesz kciukami na ekranie — nie przechylaj telefonu. Drążek pojawi się tam, gdzie dotkniesz: lewy kciuk po lewej, prawy po prawej. W poziomie jest wygodniej, ale w pionie też zadziała.'
     : 'Na komputerze sterujesz klawiaturą: W i S to góra–dół, A i D to obrót, strzałki to lot. Możesz też podłączyć gamepad.';
   show(`
     <div class="card" style="max-width:720px;margin:0 auto">
@@ -331,6 +336,7 @@ function showIntroBrief() {
       <h1 style="margin:4px 0 8px">Pierwszy lot</h1>
       <p>Polecisz dronem z GPS — takim jak popularne drony z kamerą. Przejdziemy razem start, zawis, przelot, obrót i lądowanie. Nie ma ocen ani limitu prób, a kraksy są tu za darmo.</p>
       <p class="note">${how}</p>
+      ${envTipsHtml()}
       <h2>Zanim zaczniesz: czy czujesz, że dasz radę sterować prawdziwym dronem?</h2>
       ${pollHtml('before')}
       <div class="row end" style="margin-top:14px">
@@ -378,11 +384,22 @@ function showIntroResult(res) {
   );
 }
 
+// wskazówki zależne od środowiska: przeglądarka wbudowana w aplikację, telefon w pionie
+function envTipsHtml() {
+  const tips = [];
+  const inApp = inAppBrowser();
+  if (inApp) {
+    const android = /Android/.test(navigator.userAgent);
+    tips.push(`<div class="envtip warn"><b>Gra otworzyła się wewnątrz aplikacji (${esc(inApp)}).</b> Taka przeglądarka często nie ma pełnego ekranu i nie obraca ekranu. Najlepiej otwórz grę w zwykłej przeglądarce.
+      <span class="row" style="margin-top:8px">${android ? `<a class="btn small primary" href="${chromeIntentUrl()}">Otwórz w Chrome</a>` : '<span class="note">Dotknij ⋯ lub ikony udostępniania i wybierz „Otwórz w Safari".</span>'}<button class="btn small" data-act="copy-link">Skopiuj adres</button></span></div>`);
+  }
+  if (coarse) tips.push('<div class="envtip only-portrait">W poziomie gra się wygodniej — obróć telefon. Jeśli obraz się nie obraca, włącz autoobracanie ekranu. W pionie też zadziała.</div>');
+  return tips.join('');
+}
+
 function platformName() {
-  const ua = navigator.userAgent || '';
-  if (/iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && coarse)) return 'iOS';
-  if (/Android/.test(ua)) return 'Android';
-  return 'komputer';
+  const b = browserInfo();
+  return `${b.os}, ${b.browser || b.name} ${b.ver}`.replace(/\s+$/, '');
 }
 
 // dane techniczne dołączane do opinii — pokazywane użytkownikowi wprost, nic ukrytego
@@ -390,15 +407,20 @@ function feedbackContext() {
   const p = store.data.poll || {};
   const t = store.data.totals;
   const used = Object.keys(t.sources || {}).map((k) => SRC_LABEL[k] || k);
+  const e = envSnapshot({ renderer: world.renderer, coarse, fps: app.lastBench });
   return [
     `wersja ${VERSION}`,
-    platformName(),
-    `ekran ${window.innerWidth}×${window.innerHeight}`,
+    `${e.os}${e.model ? ` (${e.model})` : ''}, ${e.browser}${e.inApp ? ` wewnątrz: ${e.inApp}` : ''}${e.standalone ? ', zainstalowana' : ''}`,
+    `ekran ${e.screen} ${e.portrait ? 'pion' : 'poziom'}`,
+    e.gpu ? `GPU ${e.gpu}` : 'WebGL: ' + (e.webgl ? 'tak' : 'nie'),
+    e.fps ? `${e.fps.fps} kl./s` : null,
     `sterowanie: ${used.length ? used.join(', ') : coarse ? 'dotyk' : 'klawiatura'}`,
     `pierwszy lot: ${store.data.introDone ? 'ukończony' : 'nieukończony'}`,
     `pewność przed/po: ${p.before || '–'}/${p.after || '–'}`,
     `loty treningowe: ${t.runs}`,
-  ].join(' · ');
+  ]
+    .filter(Boolean)
+    .join(' · ');
 }
 
 function showFeedback() {
@@ -416,6 +438,7 @@ function showFeedback() {
         <input id="fb-contact" type="text" maxlength="120" autocomplete="email" placeholder="e-mail" />
       </label>
       <p class="note">Do opinii dołączymy tylko dane techniczne: ${esc(feedbackContext())}.</p>
+      <p class="note">Coś nie działa na twoim telefonie? <button class="link" data-act="diag">Uruchom test zgodności</button> i wyślij raport.</p>
       <p id="fb-status" class="note" aria-live="polite"></p>
       <div class="row end">
         <button class="btn" data-act="menu">Wróć</button>
@@ -655,6 +678,7 @@ function showSettings() {
       <div class="set"><div>Jakość grafiki<small>Niższa oszczędza baterię i pomaga na starszych telefonach.</small></div>${seg('quality', [[1, 'Wysoka'], [0.75, 'Średnia'], [0.5, 'Niska']], s.quality)}</div>
       <div class="set"><div>Tryb kursu<small>Kolejny poziom otwiera zaliczenie poprzedniego albo trzy próby. Wyłącz, żeby mieć dostęp do wszystkiego (tryb testowy).</small></div>${seg('courseMode', [[true, 'Kurs'], [false, 'Wszystko odblokowane']], s.courseMode)}</div>
       <div class="set"><div>Kontroler<small>${gp ? esc(gp.id.slice(0, 60)) : 'Nie wykryto. Podłącz gamepad lub aparaturę RC i porusz drążkiem.'}</small></div><button class="btn small" data-act="wizard" ${gp ? '' : 'disabled'}>Przypisz osie</button></div>
+      <div class="set"><div>Zgodność urządzenia<small>Sprawdza przeglądarkę, ekran, grafikę 3D i płynność. Raport możesz nam wysłać.</small></div><button class="btn small" data-act="diag">Test zgodności</button></div>
       <div class="set"><div>Postępy<small>Wszystko jest zapisane wyłącznie na tym urządzeniu.</small></div><button class="btn small" data-act="reset">Wyzeruj postępy</button></div>
     </div>`);
 }
@@ -668,8 +692,9 @@ function showAbout() {
       <p><b>Co się przenosi na prawdziwego drona?</b> Układ i kierunki drążków, zrozumienie trybów lotu, orientacja (zwłaszcza lot „na siebie"), koordynacja obu rąk, nawyk płynnych, proporcjonalnych ruchów, czytanie sytuacji i procedury.</p>
       <p><b>Czego ekran dotykowy nie da?</b> Czucia sprężyn i precyzji prawdziwych drążków. Dlatego gra obsługuje także gamepady i aparatury RC, a wyniki zapisuje osobno dla każdego sposobu sterowania.</p>
       <p><b>Jak ćwiczyć?</b> Krótko i regularnie: 5–10 minut dziennie daje więcej niż godzina raz w tygodniu. Poziomy stopniowo zabierają ułatwienia: GPS → STABILNY → ANGLE → ACRO, potem wiatr i ciaśniejsze tolerancje.</p>
-      <p class="note">Wersja testowa ${VERSION} — fizyka jest uproszczona, a progi ocen wymagają kalibracji na testach z ludźmi. Postępy zapisują się wyłącznie na tym urządzeniu; do nas trafia tylko to, co samodzielnie wyślesz w formularzu opinii.</p>
-      <p><button class="btn small" data-act="feedback">Prześlij opinię</button></p>
+      <p><b>Sterowanie</b> jest wyłącznie kciukami na ekranie (albo gamepadem czy aparaturą) — gra nie używa żyroskopu ani przechylania telefonu. Działa w poziomie i w pionie.</p>
+      <p class="note">Wersja testowa ${VERSION} — fizyka jest uproszczona, a progi ocen wymagają kalibracji na testach z ludźmi. Postępy zapisują się wyłącznie na tym urządzeniu. Strona liczy odwiedziny anonimowo (GoatCounter, bez ciasteczek); poza tym do nas trafia tylko to, co samodzielnie wyślesz w formularzu.</p>
+      <p class="row"><button class="btn small" data-act="feedback">Prześlij opinię</button><button class="btn small" data-act="diag">Test zgodności urządzenia</button></p>
     </div>`);
 }
 
@@ -720,6 +745,16 @@ screens.addEventListener('click', (e) => {
   else if (act === 'about') showAbout();
   else if (act === 'intro') showIntroBrief();
   else if (act === 'feedback') showFeedback();
+  else if (act === 'diag') showDiag();
+  else if (act === 'diag-copy' || act === 'copy-link') {
+    const txt = act === 'copy-link' ? location.href.split('#')[0] : diagReport();
+    const st = $('#diag-status') || $('#fb-status');
+    (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(
+      () => st && (st.textContent = 'Skopiowane do schowka.'),
+      () => st && (st.textContent = 'Nie udało się skopiować — zaznacz tekst ręcznie.')
+    );
+  } else if (act === 'diag-send') sendDiag(b);
+  else if (act === 'diag-bench') app.startBench && app.startBench();
   else if (act === 'fb-send') sendFeedback(b);
   else if (act === 'fb-copy') {
     const st = $('#fb-status');
@@ -933,11 +968,97 @@ function startAttract() {
   world._look.set(4, 3, -12);
 }
 
-function checkRotate() {
-  const needs = coarse && window.innerHeight > window.innerWidth && ['countdown', 'flying'].includes(app.state);
-  $('#rotate').hidden = !needs;
-  if (needs && app.state === 'flying') pause();
-  return needs;
+// Pion czy poziom: gra działa w obu. Wcześniej pion blokował lot planszą „obróć telefon", co przy zablokowanym
+// autoobracaniu albo w przeglądarce wbudowanej w komunikator (zawsze pion) zatrzymywało testerów na dobre.
+function updateOrientation() {
+  const portrait = window.innerHeight > window.innerWidth;
+  if (app.portrait === portrait) return;
+  app.portrait = portrait;
+  document.body.classList.toggle('portrait', portrait);
+  input._layoutIdle();
+}
+
+// ------------------------------------------------------------------ test zgodności
+function diagReport() {
+  return formatReport(envSnapshot({ renderer: world.renderer, coarse, fps: app.lastBench }), { version: VERSION });
+}
+
+function showDiag() {
+  app.state = 'other';
+  setFlightUi(false);
+  const render = () => {
+    const e = envSnapshot({ renderer: world.renderer, coarse, fps: app.lastBench });
+    const v = verdicts(e);
+    const list = v.length
+      ? `<ul class="verdicts">${v.map((x) => `<li class="${x.level}">${esc(x.text)}</li>`).join('')}</ul>`
+      : '<p class="verdict-ok">Wszystko wygląda dobrze — to urządzenie powinno poradzić sobie z grą.</p>';
+    const again = '<button class="link" data-act="diag-bench">zmierz ponownie</button>';
+    const fpsLine = app.bench
+      ? 'mierzę płynność… (3 s) — nie zasłaniaj strony'
+      : e.fps
+        ? e.fps.unreliable
+          ? `nie udało się zmierzyć (strona była w tle?) · ${again}`
+          : `${e.fps.fps} kl./s${e.fps.long ? `, długich klatek: ${e.fps.long}` : ''} · ${again}`
+        : '—';
+    show(`
+    <div class="card" style="max-width:720px;margin:0 auto">
+      <div class="kicker">Wersja testowa ${VERSION}</div>
+      <h1 style="margin:4px 0 8px">Test zgodności urządzenia</h1>
+      ${list}
+      <div class="kv" style="margin-top:12px">
+        <span>Przeglądarka</span><b>${esc(e.browser)}${e.inApp ? ` · wewnątrz: ${esc(e.inApp)}` : ''}${e.standalone ? ' · zainstalowana' : ''}</b>
+        <span>System</span><b>${esc(e.os)}${e.model ? ` · ${esc(e.model)}` : ''}</b>
+        <span>Ekran</span><b>${e.screen} · ${e.portrait ? 'pion' : 'poziom'} · gęstość ${e.dpr} · punkty dotyku: ${e.touchPoints}</b>
+        <span>Grafika 3D</span><b>${e.webgl ? `tak${e.webgl2 ? ' (WebGL 2)' : ''}` : 'nie'}${e.gpu ? ` · ${esc(e.gpu)}` : ''}</b>
+        <span>Płynność</span><b id="diag-fps">${fpsLine}</b>
+        <span>Pełny ekran · blokada orientacji</span><b>${e.fullscreen ? 'tak' : 'nie'} · ${e.orientationLock ? 'tak' : 'nie'}</b>
+        <span>Wibracje · Wake Lock · gamepad</span><b>${e.vibrate ? 'tak' : 'nie'} · ${e.wakeLock ? 'tak' : 'nie'} · ${e.gamepad ? 'tak' : 'nie'}</b>
+        <span>Offline · pamięć lokalna</span><b>${e.serviceWorker ? 'tak' : 'nie'} · ${e.storage ? 'tak' : 'nie'}</b>
+      </div>
+      <details style="margin-top:10px"><summary class="note">Pełny raport (to, co wyślesz)</summary><pre class="report">${esc(diagReport())}</pre></details>
+      <label class="fld">Co nie działa? (nieobowiązkowo)<textarea id="diag-msg" rows="3" maxlength="1000" placeholder="Na przykład: ekran się nie obraca, drążki nie reagują, obraz się tnie…"></textarea></label>
+      <p id="diag-status" class="note" aria-live="polite"></p>
+      <div class="row end">
+        <button class="btn" data-act="menu">Wróć</button>
+        <button class="btn" data-act="diag-copy">Skopiuj raport</button>
+        <button class="btn primary" data-act="diag-send">Wyślij raport</button>
+      </div>
+    </div>`);
+  };
+  render();
+  loadHighEntropy().then(() => app.state === 'other' && $('#diag-fps') && render());
+  app.startBench = () => {
+    if (app.bench) return;
+    app.bench = { t0: performance.now(), frames: 0, long: 0, dur: 3000 };
+    app.bench.done = () => {
+      if (app.state === 'other' && $('#diag-fps')) render();
+    };
+    render();
+  };
+  if (!app.lastBench || app.lastBench.unreliable) app.startBench();
+}
+
+async function sendDiag(btn) {
+  const st = $('#diag-status');
+  const msg = (($('#diag-msg') || {}).value || '').trim();
+  btn.disabled = true;
+  st.textContent = 'Wysyłamy…';
+  try {
+    const fd = new FormData();
+    fd.append('access_key', W3F_KEY);
+    fd.append('subject', '[ZGODNOŚĆ] FuturePilot — test urządzenia');
+    fd.append('from_name', 'futureshow.pl / FuturePilot');
+    fd.append('message', `${msg ? msg + '\n\n' : ''}${diagReport()}`);
+    fd.append('botcheck', '');
+    const r = await fetch('https://api.web3forms.com/submit', { method: 'POST', headers: { Accept: 'application/json' }, body: fd });
+    const d = await r.json();
+    if (!d.success) throw new Error('odrzucone');
+    st.textContent = 'Dziękujemy — raport doszedł.';
+  } catch (e) {
+    st.textContent = 'Nie udało się wysłać. Skopiuj raport i prześlij go wiadomością.';
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 // ------------------------------------------------------------------ pętla
@@ -953,6 +1074,25 @@ function frame(now) {
 // jeden krok gry; wywoływany z pętli animacji albo z testów (window.__fp.step)
 function step(dt, render = true) {
   frameNo++;
+  // pomiar płynności (test zgodności): liczy klatki przez ~3 s i wymusza rysowanie każdej
+  const bench = app.bench;
+  if (bench) {
+    const now = performance.now();
+    if (document.visibilityState === 'hidden') bench.t0 += now - (bench.last || now); // strona w tle: pauza pomiaru
+    else {
+      bench.frames++;
+      if (dt > 1 / 30) bench.long++;
+    }
+    bench.last = now;
+    if (now - bench.t0 >= bench.dur) {
+      const secs = (now - bench.t0) / 1000;
+      const fps = bench.frames / secs;
+      // poniżej 8 kl./s to niemal na pewno przeglądarka dławiąca kartę w tle, nie słaby telefon
+      app.lastBench = { fps: Math.round(fps), long: bench.long, secs: Math.round(secs * 10) / 10, unreliable: fps < 8 };
+      app.bench = null;
+      bench.done && bench.done(app.lastBench);
+    }
+  }
   const sticks = input.update(dt);
   ctx.sticks = sticks;
   const st = app.state;
@@ -965,7 +1105,7 @@ function step(dt, render = true) {
   }
 
   if (st === 'countdown') {
-    if (!checkRotate()) app.cd -= dt;
+    app.cd -= dt;
     const el = $('#countdown');
     el.hidden = false;
     const n = Math.ceil(app.cd / 0.8);
@@ -976,7 +1116,6 @@ function step(dt, render = true) {
       audio.beep(1320, 0.12);
     }
   } else if (st === 'flying') {
-    checkRotate();
     const drill = app.drill;
     drill.t += dt;
     if (sim.crashed) {
@@ -1045,7 +1184,7 @@ function step(dt, render = true) {
   world.setWindsock(wind.cur);
   world.update(sim, dt);
   const menuLike = st !== 'flying' && st !== 'countdown';
-  if (render && (!menuLike || frameNo % 2 === 0)) world.render();
+  if (render && (!menuLike || frameNo % 2 === 0 || app.bench)) world.render();
   const dist = Math.hypot(sim.p.x - PILOT.x, sim.p.y - PILOT.y, sim.p.z - PILOT.z);
   audio.update(sim.thrust / sim.tMax, world.view === 'los' ? dist : 2, st === 'flying' && !sim.crashed);
 }
@@ -1054,7 +1193,9 @@ function step(dt, render = true) {
 if ('serviceWorker' in navigator && location.protocol === 'https:') {
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
-window.addEventListener('resize', checkRotate);
+window.addEventListener('resize', updateOrientation);
+updateOrientation();
+loadHighEntropy();
 showMenu();
 requestAnimationFrame(frame);
 

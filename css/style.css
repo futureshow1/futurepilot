@@ -34,10 +34,18 @@ body {
 }
 body {
   position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
   inset: 0;
 }
 #gl {
   position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
   inset: 0;
   width: 100%;
   height: 100%;
@@ -57,6 +65,10 @@ button {
 /* ---------- sterowanie dotykowe ---------- */
 #touch-layer {
   position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
   inset: 0;
   touch-action: none;
   display: none;
@@ -120,6 +132,10 @@ body.src-pad #touch-layer .stick {
 /* ---------- HUD ---------- */
 #hud {
   position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
   inset: 0;
   pointer-events: none;
   z-index: 10;
@@ -287,6 +303,10 @@ body.src-pad #touch-layer .stick {
 }
 #osd {
   position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
   inset: 0;
   font: 700 13px/1.5 ui-monospace, 'SF Mono', Menlo, monospace;
   color: #f4f7fb;
@@ -364,6 +384,10 @@ body.src-pad #touch-layer .stick {
 
 #countdown {
   position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
   inset: 0;
   z-index: 30;
   display: grid;
@@ -378,12 +402,20 @@ body.src-pad #touch-layer .stick {
 /* ---------- ekrany ---------- */
 #screens {
   position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
   inset: 0;
   z-index: 40;
   pointer-events: none;
 }
 .screen {
   position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
   inset: 0;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
@@ -815,43 +847,7 @@ canvas.trace {
   color: #1a1204;
 }
 
-#rotate {
-  position: fixed;
-  inset: 0;
-  z-index: 100;
-  background: var(--bg);
-  display: grid;
-  place-items: center;
-  text-align: center;
-  padding: 24px;
-}
-#rotate p {
-  font-size: 20px;
-  font-weight: 800;
-  margin: 8px 0;
-}
-#rotate small {
-  color: var(--muted);
-}
-.rot-ico {
-  font-size: 64px;
-  color: var(--accent);
-  animation: rot 2.4s ease-in-out infinite;
-}
-@keyframes rot {
-  0%,
-  30% {
-    transform: rotate(0);
-  }
-  60%,
-  100% {
-    transform: rotate(90deg);
-  }
-}
 @media (prefers-reduced-motion: reduce) {
-  .rot-ico {
-    animation: none;
-  }
   #hud-flash {
     transition: none;
   }
@@ -1062,4 +1058,99 @@ button.link {
 .fld input:focus {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
+}
+
+/* ---------- pion: gra działa, drążki w dolnych rogach, HUD w dwóch rzędach ---------- */
+body:not(.portrait) .only-portrait {
+  display: none;
+}
+body.portrait .hud-top {
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+body.portrait .hud-top .badges {
+  grid-row: 1;
+}
+body.portrait .hud-top .right {
+  grid-row: 1;
+}
+body.portrait .hud-top .objective {
+  grid-column: 1 / -1;
+  grid-row: 2;
+}
+body.portrait #stick-monitor {
+  display: none; /* w pionie drążki są w polu widzenia — podgląd tylko zasłaniałby obraz */
+}
+body.portrait .osd-l,
+body.portrait .osd-r {
+  top: 34%;
+}
+body.portrait #hud-flash {
+  top: 38%;
+  white-space: normal;
+  max-width: 88vw;
+  text-align: center;
+}
+
+/* ---------- wskazówki środowiskowe (przeglądarka w aplikacji, pion) ---------- */
+.envtip {
+  font-size: 13.5px;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--blue);
+  border-radius: 10px;
+  padding: 9px 12px;
+  margin: 0 0 12px;
+}
+.envtip.warn {
+  border-left-color: var(--accent);
+}
+.envtip .row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+a.btn {
+  text-decoration: none;
+}
+
+/* ---------- test zgodności ---------- */
+.verdicts {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+.verdicts li {
+  padding: 9px 12px;
+  border-radius: 10px;
+  background: var(--panel2);
+  border-left: 3px solid var(--blue);
+  font-size: 13.5px;
+}
+.verdicts li.warn {
+  border-left-color: var(--accent);
+}
+.verdicts li.bad {
+  border-left-color: var(--bad);
+}
+.verdict-ok {
+  color: var(--ok);
+  font-weight: 650;
+  margin: 0;
+}
+.report {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font: 12px/1.5 ui-monospace, 'SF Mono', Menlo, monospace;
+  background: #0d1626;
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin: 8px 0 0;
+  color: var(--muted);
+  -webkit-user-select: text;
+  user-select: text;
 }

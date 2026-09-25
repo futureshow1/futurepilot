@@ -353,23 +353,24 @@ export class World {
       cam.up.set(0, 1, 0);
       cam.lookAt(this._look);
       const dist = cam.position.distanceTo(d.position);
-      const fov = this.zoomAssist ? THREE.MathUtils.clamp(56 * Math.sqrt(11 / Math.max(dist, 11)), 17, 56) : 56;
+      const base = this._fov(56);
+      const fov = this.zoomAssist ? THREE.MathUtils.clamp(base * Math.sqrt(11 / Math.max(dist, 11)), 17, base) : base;
       if (Math.abs(fov - cam.fov) > 0.05) {
         cam.fov += (fov - cam.fov) * (1 - Math.exp(-dt * 4));
         cam.updateProjectionMatrix();
       }
     } else if (this.view === 'fpv') {
-      this._setFov(88);
+      this._setFov(this._fov(88));
       cam.quaternion.copy(d.quaternion).multiply(this._tmpQ.setFromAxisAngle(new THREE.Vector3(1, 0, 0), this.uptilt));
       cam.position.copy(d.position).add(this._tmp.set(0, 0.035, -0.1).applyQuaternion(d.quaternion));
     } else if (this.view === 'cam') {
       // kamera na gimbalu: stabilizowany horyzont, obrót tylko z kursem drona
-      this._setFov(58);
+      this._setFov(this._fov(58));
       cam.quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), sim.heading).multiply(this._tmpQ.setFromAxisAngle(new THREE.Vector3(1, 0, 0), -7 * DEG));
       cam.position.copy(d.position).add(this._tmp.set(0, -0.02, 0));
     } else {
       // chase — kółka boczne na pierwsze minuty
-      this._setFov(62);
+      this._setFov(this._fov(62));
       const fx = -Math.sin(sim.heading),
         fz = -Math.cos(sim.heading);
       const want = this._tmp.set(sim.p.x - fx * 3.4, sim.p.y + 1.5, sim.p.z - fz * 3.4);
@@ -382,6 +383,11 @@ export class World {
       cam.up.set(0, 1, 0);
       cam.lookAt(sim.p.x + fx * 2, sim.p.y + 0.2, sim.p.z + fz * 2);
     }
+  }
+
+  // fov w three.js jest pionowe; w pionie (aspekt < 1) poszerzamy je, żeby nie stracić pola widzenia w poziomie
+  _fov(f) {
+    return this.camera.aspect < 1 ? Math.min(f * 1.35, 100) : f;
   }
 
   _setFov(f) {

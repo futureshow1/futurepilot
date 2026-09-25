@@ -62,15 +62,8 @@
 
     <div id="countdown" hidden></div>
     <div id="screens"></div>
-    <div id="rotate" hidden>
-      <div>
-        <div class="rot-ico">⟳</div>
-        <p>Obróć telefon poziomo</p>
-        <small>Drążki działają jak w prawdziwej aparaturze — pod kciukami po obu stronach ekranu.</small>
-      </div>
-    </div>
-
     <noscript>Do działania potrzebny jest JavaScript.</noscript>
     <script type="module" src="js/main.js"></script>
+    <script nomodule>document.body.insertAdjacentHTML('afterbegin','<div style="position:fixed;top:0;left:0;right:0;bottom:0;background:#0b1320;color:#e8eef7;display:flex;align-items:center;justify-content:center;padding:24px;text-align:center;font:16px/1.5 system-ui,sans-serif"><div><b>Ta przeglądarka jest za stara, żeby uruchomić grę.</b><br>Zaktualizuj ją albo otwórz adres w Chrome lub Safari.</div></div>')</script>
   </body>
 </html>
