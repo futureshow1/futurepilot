@@ -136,6 +136,19 @@ const POLICIES = {
     const s = fp.sim;
     const Z = { throttle: 0, yaw: 0, pitch: 0, roll: 0 };
     const id = d.steps[Math.min(d.k, d.steps.length - 1)].id;
+    if (id === 'kciuki') {
+      // krok „połóż kciuki" wymaga prawdziwych dotknięć — na ekranie dotykowym symulujemy je zdarzeniami wskaźnika
+      const layer = document.getElementById('touch-layer');
+      const ev = (type, pid, x, y) => layer.dispatchEvent(new PointerEvent(type, { pointerId: pid, pointerType: 'touch', clientX: x, clientY: y, bubbles: true, cancelable: true }));
+      const W = innerWidth, H = innerHeight;
+      ev('pointerdown', 901, W * 0.2, H * 0.85);
+      ev('pointerdown', 902, W * 0.8, H * 0.85);
+      fp.input.injected = null;
+      fp.step(1 / 60, false);
+      ev('pointerup', 901, W * 0.2, H * 0.85);
+      ev('pointerup', 902, W * 0.8, H * 0.85);
+      return Z;
+    }
     if (s.landed && ['przod', 'bok', 'obrot', 'powrot'].includes(id)) return { ...Z, throttle: 0.8 };
     if (id === 'start') return { ...Z, throttle: 0.8 };
     if (id === 'zawis') return s.landed ? { ...Z, throttle: 0.8 } : Z;
